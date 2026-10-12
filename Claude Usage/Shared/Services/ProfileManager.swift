@@ -167,6 +167,44 @@ class ProfileManager: ObservableObject {
             : profiles.filter { $0.isSelectedForDisplay }
     }
 
+    /// True when multi-profile mode shows a single menu bar icon whose popover
+    /// stacks every selected profile.
+    var isCombinedMultiProfileMode: Bool {
+        displayMode == .multi && multiProfileConfig.combineIntoSingleIcon
+    }
+
+    /// The selected profile whose usage drives the single combined icon:
+    /// the user's explicit choice, else the active profile, else the first selected.
+    var menuBarProfile: Profile? {
+        let selected = profiles.filter { $0.isSelectedForDisplay }
+        if let id = multiProfileConfig.menuBarProfileId,
+           let chosen = selected.first(where: { $0.id == id }) {
+            return chosen
+        }
+        if let active = activeProfile, let match = selected.first(where: { $0.id == active.id }) {
+            return match
+        }
+        return selected.first
+    }
+
+    /// Profiles to stack in the combined popover, menu bar profile first.
+    var combinedPopoverProfiles: [Profile] {
+        let selected = profiles.filter { $0.isSelectedForDisplay }
+        guard let first = menuBarProfile else { return selected }
+        return [first] + selected.filter { $0.id != first.id }
+    }
+
+    /// Chooses which profile the combined menu bar icon shows. Does not switch
+    /// the active profile (that would swap Claude Code CLI credentials).
+    func setMenuBarProfile(_ id: UUID) {
+        guard multiProfileConfig.menuBarProfileId != id || menuBarProfile?.id != id else { return }
+        var config = multiProfileConfig
+        config.menuBarProfileId = id
+        multiProfileConfig = config
+        profileStore.saveMultiProfileConfig(config)
+        NotificationCenter.default.post(name: .multiProfileConfigChanged, object: nil)
+    }
+
     func updateDisplayMode(_ mode: ProfileDisplayMode) {
         // Use async to avoid "Publishing changes from within view updates" warning
         DispatchQueue.main.async { [weak self] in

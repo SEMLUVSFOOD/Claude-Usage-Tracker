@@ -69,16 +69,6 @@ struct PopoverContentView: View {
     @State private var appeared = false
     @StateObject private var profileManager = ProfileManager.shared
 
-    private func profileInitials(for name: String) -> String {
-        let words = name.split(separator: " ")
-        if words.count >= 2 {
-            return String(words[0].prefix(1) + words[1].prefix(1)).uppercased()
-        } else if let first = words.first {
-            return String(first.prefix(2)).uppercased()
-        }
-        return "?"
-    }
-
     // Computed properties for multi-profile mode support
     private var displayUsage: ClaudeUsage {
         manager.clickedProfileUsage ?? manager.usage
@@ -102,30 +92,38 @@ struct PopoverContentView: View {
         return viewingProfile?.provider ?? .anthropic
     }
 
+    private func refreshWithSpinner() {
+        withAnimation(.easeInOut(duration: 0.3)) {
+            isRefreshing = true
+        }
+        onRefresh()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            withAnimation(.easeInOut(duration: 0.3)) {
+                isRefreshing = false
+            }
+        }
+    }
+
+    private var isCombinedLayout: Bool {
+        profileManager.isCombinedMultiProfileMode && !profileManager.combinedPopoverProfiles.isEmpty
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Header
-            SmartHeader(
-                usage: displayUsage,
-                status: manager.status,
-                isRefreshing: isRefreshing,
-                onRefresh: {
-                    withAnimation(.easeInOut(duration: 0.3)) {
-                        isRefreshing = true
-                    }
-                    onRefresh()
-                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                        withAnimation(.easeInOut(duration: 0.3)) {
-                            isRefreshing = false
-                        }
-                    }
-                },
-                onManageProfiles: onPreferences,
-                onPreferences: onPreferences,
-                clickedProfileId: manager.clickedProfileId
-            )
+            // Header (combined mode puts its controls on the first profile row instead)
+            if !isCombinedLayout {
+                SmartHeader(
+                    usage: displayUsage,
+                    status: manager.status,
+                    isRefreshing: isRefreshing,
+                    onRefresh: refreshWithSpinner,
+                    onManageProfiles: onPreferences,
+                    onPreferences: onPreferences,
+                    clickedProfileId: manager.clickedProfileId
+                )
 
-            PopoverDivider()
+                PopoverDivider()
+            }
 
             // Error / stale data banners
             if manager.hasCredentialError {
@@ -156,59 +154,52 @@ struct PopoverContentView: View {
                 }
             }
 
-            // Viewing usage tag (shown in multi-profile mode)
-            if profileManager.displayMode == .multi,
-               let viewingProfile = manager.clickedProfileId.flatMap({ id in
-                   profileManager.profiles.first(where: { $0.id == id })
-               }) ?? profileManager.activeProfile {
-                HStack(spacing: 8) {
-                    // Profile initials avatar
-                    ZStack {
-                        Circle()
-                            .fill(Color.accentColor.opacity(0.15))
-                            .frame(width: 20, height: 20)
-
-                        Text(profileInitials(for: viewingProfile.name))
-                            .font(.system(size: 8, weight: .bold, design: .rounded))
-                            .foregroundColor(.accentColor)
+            if isCombinedLayout {
+                // Combined mode: one icon in the menu bar, every selected profile stacked here
+                let profiles = profileManager.combinedPopoverProfiles
+                let menuBarProfileId = profileManager.menuBarProfile?.id
+                ForEach(Array(profiles.enumerated()), id: \.element.id) { index, profile in
+                    if index > 0 {
+                        PopoverDivider()
+                            .padding(.top, 6)
                     }
-
-                    Text(viewingProfile.name)
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.primary)
-                        .lineLimit(1)
-
-                    if viewingProfile.provider != .anthropic {
-                        ProviderLogoView(provider: viewingProfile.provider, size: 10)
-                            .foregroundColor(.secondary)
-                    }
-
-                    Spacer()
-
-                    if viewingProfile.id == profileManager.activeProfile?.id {
-                        Text("Active")
-                            .font(.system(size: 8, weight: .semibold))
-                            .foregroundColor(.accentColor)
-                            .padding(.horizontal, 5)
-                            .padding(.vertical, 2)
-                            .background(
-                                Capsule()
-                                    .fill(Color.accentColor.opacity(0.12))
-                            )
-                    }
+                    ProfileUsageTag(
+                        profile: profile,
+                        isActive: profile.id == profileManager.activeProfile?.id,
+                        menuBarSelection: profiles.count > 1
+                            ? (profile.id == menuBarProfileId ? .shown : .selectable)
+                            : nil,
+                        onShowInMenuBar: {
+                            profileManager.setMenuBarProfile(profile.id)
+                        },
+                        accessory: index == 0 ? AnyView(CombinedHeaderControls(
+                            status: manager.status,
+                            isRefreshing: isRefreshing,
+                            onRefresh: refreshWithSpinner,
+                            onPreferences: onPreferences
+                        )) : nil
+                    )
+                    SmartUsageDashboard(
+                        usage: profile.claudeUsage ?? .empty,
+                        apiUsage: profile.apiUsage,
+                        provider: profile.provider
+                    )
                 }
-                .padding(.horizontal, 14)
-                .padding(.vertical, 6)
-                .background(
-                    RoundedRectangle(cornerRadius: 6)
-                        .fill(Color.primary.opacity(0.03))
-                )
-                .padding(.horizontal, 10)
-                .padding(.top, 6)
-            }
+            } else {
+                // Viewing usage tag (shown in multi-profile mode)
+                if profileManager.displayMode == .multi,
+                   let viewingProfile = manager.clickedProfileId.flatMap({ id in
+                       profileManager.profiles.first(where: { $0.id == id })
+                   }) ?? profileManager.activeProfile {
+                    ProfileUsageTag(
+                        profile: viewingProfile,
+                        isActive: viewingProfile.id == profileManager.activeProfile?.id
+                    )
+                }
 
-            // Usage
-            SmartUsageDashboard(usage: displayUsage, apiUsage: displayAPIUsage, provider: displayProvider)
+                // Usage
+                SmartUsageDashboard(usage: displayUsage, apiUsage: displayAPIUsage, provider: displayProvider)
+            }
 
             // Contextual Insights
             if showInsights {
@@ -218,6 +209,7 @@ struct PopoverContentView: View {
             }
 
         }
+        .padding(.top, isCombinedLayout ? 4 : 0)
         .padding(.bottom, 8)
         .frame(width: 280)
         .background(VisualEffectBackground())
@@ -229,6 +221,171 @@ struct PopoverContentView: View {
                 appeared = true
             }
         }
+    }
+}
+
+// MARK: - Profile Usage Tag
+
+/// Avatar + name row that labels a profile's usage section in multi-profile mode.
+/// In combined mode it doubles as the control for choosing the menu bar profile.
+struct ProfileUsageTag: View {
+    enum MenuBarSelection {
+        case shown       // This profile drives the menu bar icon
+        case selectable  // Clicking the row makes this profile drive the icon
+    }
+
+    let profile: Profile
+    let isActive: Bool
+    var menuBarSelection: MenuBarSelection? = nil
+    var onShowInMenuBar: () -> Void = {}
+    /// Extra controls at the trailing edge (combined mode: refresh/settings)
+    var accessory: AnyView? = nil
+
+    @State private var isHovered = false
+
+    private var initials: String {
+        let words = profile.name.split(separator: " ")
+        if words.count >= 2 {
+            return String(words[0].prefix(1) + words[1].prefix(1)).uppercased()
+        } else if let first = words.first {
+            return String(first.prefix(2)).uppercased()
+        }
+        return "?"
+    }
+
+    var body: some View {
+        let row = HStack(spacing: 8) {
+            // Profile initials avatar
+            ZStack {
+                Circle()
+                    .fill(Color.accentColor.opacity(0.15))
+                    .frame(width: 20, height: 20)
+
+                Text(initials)
+                    .font(.system(size: 8, weight: .bold, design: .rounded))
+                    .foregroundColor(.accentColor)
+            }
+
+            Text(profile.name)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(.primary)
+                .lineLimit(1)
+
+            if profile.provider != .anthropic {
+                ProviderLogoView(provider: profile.provider, size: 10)
+                    .foregroundColor(.secondary)
+            }
+
+            Spacer()
+
+            if isActive {
+                Text("Active")
+                    .font(.system(size: 8, weight: .semibold))
+                    .foregroundColor(.accentColor)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 2)
+                    .background(
+                        Capsule()
+                            .fill(Color.accentColor.opacity(0.12))
+                    )
+            }
+
+            switch menuBarSelection {
+            case .shown:
+                Image(systemName: "menubar.rectangle")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(.accentColor)
+                    .help("Shown in the menu bar")
+            case .selectable:
+                Image(systemName: "menubar.rectangle")
+                    .font(.system(size: 10, weight: .regular))
+                    .foregroundColor(.secondary)
+                    .opacity(isHovered ? 1 : 0.35)
+            case nil:
+                EmptyView()
+            }
+
+            if let accessory = accessory {
+                accessory
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.primary.opacity(isHovered && menuBarSelection == .selectable ? 0.07 : 0.03))
+        )
+        .padding(.horizontal, 10)
+        .padding(.top, 6)
+
+        if menuBarSelection == .selectable {
+            Button(action: onShowInMenuBar) {
+                row.contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Show \(profile.name) in the menu bar")
+            .onHover { hovering in
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    isHovered = hovering
+                }
+            }
+        } else {
+            row
+        }
+    }
+}
+
+// MARK: - Combined Header Controls
+
+/// Service status dot + refresh + settings, shown on the top profile row in
+/// combined multi-profile mode (replaces the profile-switcher header).
+struct CombinedHeaderControls: View {
+    let status: ClaudeStatus
+    let isRefreshing: Bool
+    let onRefresh: () -> Void
+    let onPreferences: () -> Void
+
+    private var statusColor: Color {
+        switch status.indicator.color {
+        case .green: return .adaptiveGreen
+        case .yellow: return .yellow
+        case .orange: return .orange
+        case .red: return .red
+        case .gray: return .gray
+        }
+    }
+
+    var body: some View {
+        HStack(alignment: .center, spacing: 0) {
+            Button(action: {
+                if let url = URL(string: "https://status.claude.com") {
+                    NSWorkspace.shared.open(url)
+                }
+            }) {
+                Circle()
+                    .fill(statusColor)
+                    .frame(width: 6, height: 6)
+                    .frame(width: 18, height: 24)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help(status.description)
+
+            HeaderIconButton(
+                icon: "arrow.clockwise",
+                isRefreshing: isRefreshing,
+                action: onRefresh
+            )
+            .disabled(isRefreshing)
+
+            HeaderIconButton(
+                icon: "gearshape.fill",
+                fontSize: 12,
+                action: onPreferences
+            )
+        }
+        .padding(.vertical, -4)
+        .padding(.trailing, -6)
     }
 }
 

@@ -54,9 +54,11 @@ final class UpdateManager: ObservableObject {
         // Create user driver delegate for gentle reminders
         userDriver = UpdateUserDriver()
 
-        // Initialize Sparkle updater with user driver delegate
+        // Initialize Sparkle updater with user driver delegate.
+        // Not started: this fork must not pull upstream releases (the appcast
+        // in Info.plist belongs to the original project) over local builds.
         updaterController = SPUStandardUpdaterController(
-            startingUpdater: true,
+            startingUpdater: false,
             updaterDelegate: nil,
             userDriverDelegate: userDriver
         )
@@ -69,6 +71,10 @@ final class UpdateManager: ObservableObject {
 
     /// Manually check for updates
     func checkForUpdates() {
+        guard canCheckForUpdates else {
+            LoggingService.shared.logInfo("Update check skipped: updates are disabled in this fork")
+            return
+        }
         updaterController.checkForUpdates(nil)
         LoggingService.shared.logInfo("Manual update check triggered")
     }

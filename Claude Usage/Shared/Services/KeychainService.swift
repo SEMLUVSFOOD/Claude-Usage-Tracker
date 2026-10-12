@@ -295,22 +295,12 @@ class KeychainService {
     /// wrote throws the "wants to use your confidential information" password
     /// dialog. Ad-hoc builds therefore skip the file-based store entirely and
     /// keep the legacy plist fallback (pre-#292 behavior, zero prompts).
-    private lazy var fileBasedFallbackAllowed: Bool = {
-        var code: SecCode?
-        guard SecCodeCopySelf([], &code) == errSecSuccess, let code = code else { return false }
-        var staticCode: SecStaticCode?
-        guard SecCodeCopyStaticCode(code, [], &staticCode) == errSecSuccess,
-              let staticCode = staticCode else { return false }
-        var info: CFDictionary?
-        guard SecCodeCopySigningInformation(staticCode, SecCSFlags(rawValue: kSecCSSigningInformation),
-                                            &info) == errSecSuccess,
-              let dict = info as? [String: Any] else { return false }
-        guard let teamId = dict[kSecCodeInfoTeamIdentifier as String] as? String, !teamId.isEmpty else {
-            LoggingService.shared.log("Keychain: ad-hoc signing identity — file-based login keychain fallback disabled to avoid ACL password prompts")
-            return false
-        }
-        return true
-    }()
+    ///
+    /// Fork: local builds (scripts/build-local.sh) are ad-hoc signed, but the
+    /// secrets written by the upstream Developer ID app live in the login
+    /// keychain. Keep using it; macOS asks once per build to "Always Allow"
+    /// instead of the profiles silently losing their credentials.
+    private let fileBasedFallbackAllowed = true
 
     /// Whether per-profile secret storage is usable in this build.
     /// Probes with a throwaway item; with the file-based fallback this only

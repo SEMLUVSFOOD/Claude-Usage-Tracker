@@ -239,6 +239,21 @@ struct ManageProfilesView: View {
                                 )
                             )
 
+                            // Combine Into Single Icon Toggle
+                            SettingToggle(
+                                title: "Single menu bar icon",
+                                description: "Show one icon and list every selected profile in its dropdown. Pick which profile the icon shows from the dropdown.",
+                                isOn: Binding(
+                                    get: { profileManager.multiProfileConfig.combineIntoSingleIcon },
+                                    set: { combine in
+                                        var config = profileManager.multiProfileConfig
+                                        config.combineIntoSingleIcon = combine
+                                        profileManager.updateMultiProfileConfig(config)
+                                        NotificationCenter.default.post(name: .multiProfileConfigChanged, object: nil)
+                                    }
+                                )
+                            )
+
                             // Show Active Profile Indicator Toggle
                             SettingToggle(
                                 title: "multiprofile.active_indicator_title".localized,

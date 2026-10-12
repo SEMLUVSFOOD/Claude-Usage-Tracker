@@ -532,7 +532,9 @@ class MenuBarManager: NSObject, ObservableObject {
         if let button = sender as? NSStatusBarButton {
             clickedButton = button
         } else if statusBarUIManager?.isInMultiProfileMode == true,
-                  let activeId = profileManager.activeProfile?.id,
+                  let activeId = profileManager.isCombinedMultiProfileMode
+                    ? profileManager.menuBarProfile?.id
+                    : profileManager.activeProfile?.id,
                   let activeButton = statusBarUIManager?.button(for: activeId) {
             // Multi-profile mode: use the active profile's button
             clickedButton = activeButton
@@ -703,7 +705,7 @@ class MenuBarManager: NSObject, ObservableObject {
             // Update multi-profile icons using profiles from profileManager
             let config = profileManager.multiProfileConfig
             statusBarUIManager?.updateMultiProfileButtons(
-                profiles: profileManager.profiles,
+                profiles: statusBarProfiles,
                 config: config,
                 activeProfileId: profileManager.activeProfile?.id
             )
@@ -885,6 +887,7 @@ class MenuBarManager: NSObject, ObservableObject {
 
             Task { @MainActor in
                 self.updateMultiProfileDisplay()
+                self.reanchorPopoverIfButtonRemoved()
             }
         }
     }
@@ -944,12 +947,22 @@ class MenuBarManager: NSObject, ObservableObject {
         return ProviderRegistry.service(for: profile.provider).hasCredentials(for: profile)
     }
 
+    /// Profiles that get their own status item in multi-profile mode. In combined
+    /// mode only the chosen menu bar profile gets one; the popover lists the rest.
+    private var statusBarProfiles: [Profile] {
+        if profileManager.isCombinedMultiProfileMode {
+            return profileManager.menuBarProfile.map { [$0] } ?? []
+        }
+        return profileManager.profiles
+    }
+
     private func setupMultiProfileMode() {
         let selectedProfiles = profileManager.getSelectedProfiles()
         let config = profileManager.multiProfileConfig
 
+        statusBarUIManager?.combinesIntoSingleItem = profileManager.isCombinedMultiProfileMode
         statusBarUIManager?.setupMultiProfile(
-            profiles: selectedProfiles,
+            profiles: statusBarProfiles,
             target: self,
             action: #selector(togglePopover)
         )
@@ -957,8 +970,10 @@ class MenuBarManager: NSObject, ObservableObject {
         // Defer icon update to next run loop iteration to let NSStatusBar finalize layout
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            self.statusBarUIManager?.updateMultiProfileButtons(profiles: self.profileManager.profiles, config: config, activeProfileId: self.profileManager.activeProfile?.id)
+            self.statusBarUIManager?.updateMultiProfileButtons(profiles: self.statusBarProfiles, config: config, activeProfileId: self.profileManager.activeProfile?.id)
         }
+
+        redrawMultiProfileIconsAfterPlacement()
 
         LoggingService.shared.log("MenuBarManager: Multi-profile mode enabled with \(selectedProfiles.count) profiles, style=\(config.iconStyle.rawValue)")
 
@@ -972,8 +987,9 @@ class MenuBarManager: NSObject, ObservableObject {
         let selectedProfiles = profileManager.getSelectedProfiles()
         let config = profileManager.multiProfileConfig
 
+        statusBarUIManager?.combinesIntoSingleItem = profileManager.isCombinedMultiProfileMode
         statusBarUIManager?.updateMultiProfileConfiguration(
-            profiles: selectedProfiles,
+            profiles: statusBarProfiles,
             target: self,
             action: #selector(togglePopover)
         )
@@ -983,10 +999,37 @@ class MenuBarManager: NSObject, ObservableObject {
         // This prevents potential flicker or layout issues during incremental updates.
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            self.statusBarUIManager?.updateMultiProfileButtons(profiles: self.profileManager.profiles, config: config, activeProfileId: self.profileManager.activeProfile?.id)
+            self.statusBarUIManager?.updateMultiProfileButtons(profiles: self.statusBarProfiles, config: config, activeProfileId: self.profileManager.activeProfile?.id)
         }
+        redrawMultiProfileIconsAfterPlacement()
 
         LoggingService.shared.log("MenuBarManager: Multi-profile display updated incrementally with \(selectedProfiles.count) profiles")
+    }
+
+    /// A freshly created status button can report the wrong (light) appearance
+    /// until the menu bar has placed it, which renders dark-on-dark markers.
+    /// Redraw once it has settled so the icon picks up the real appearance.
+    private func redrawMultiProfileIconsAfterPlacement() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            guard let self = self, self.profileManager.displayMode == .multi else { return }
+            self.updateAllStatusBarIcons()
+        }
+    }
+
+    /// In combined mode, choosing a different menu bar profile replaces the status
+    /// item the popover is anchored to. Re-open the popover on the new item so the
+    /// dropdown stays visible instead of floating over a removed button.
+    private func reanchorPopoverIfButtonRemoved() {
+        guard detachedWindow == nil,
+              let popover = popover, popover.isShown,
+              let button = currentPopoverButton,
+              statusBarUIManager?.profileId(for: button) == nil else { return }
+        popover.close()
+        stopMonitoringForOutsideClicks()
+        currentPopoverButton = nil
+        DispatchQueue.main.async { [weak self] in
+            self?.togglePopover(nil)
+        }
     }
 
     /// Refreshes usage data for all profiles selected for multi-profile display
@@ -1109,7 +1152,7 @@ class MenuBarManager: NSObject, ObservableObject {
             await MainActor.run {
                 let config = self.profileManager.multiProfileConfig
                 self.statusBarUIManager?.updateMultiProfileButtons(
-                    profiles: self.profileManager.profiles,
+                    profiles: self.statusBarProfiles,
                     config: config,
                     activeProfileId: self.profileManager.activeProfile?.id
                 )

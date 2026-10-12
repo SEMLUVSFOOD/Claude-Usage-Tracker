@@ -293,6 +293,8 @@ struct MultiProfileDisplayConfig: Codable, Equatable {
     var usePaceColoring: Bool // If true, color indicators based on projected usage pace
     var showRemainingPercentage: Bool // If true, show remaining capacity instead of used percentage
     var showActiveProfileIndicator: Bool // If true, show a green underline on the active profile's icon
+    var combineIntoSingleIcon: Bool // If true, show one menu bar icon and stack all selected profiles in its popover
+    var menuBarProfileId: UUID?     // Profile whose usage drives the single combined icon (nil = active profile)
 
     init(
         iconStyle: MultiProfileIconStyle = .concentric,
@@ -303,7 +305,9 @@ struct MultiProfileDisplayConfig: Codable, Equatable {
         showPaceMarker: Bool = true,
         usePaceColoring: Bool = true,
         showRemainingPercentage: Bool = false,
-        showActiveProfileIndicator: Bool = false
+        showActiveProfileIndicator: Bool = false,
+        combineIntoSingleIcon: Bool = true,
+        menuBarProfileId: UUID? = nil
     ) {
         self.iconStyle = iconStyle
         self.showWeek = showWeek
@@ -314,6 +318,8 @@ struct MultiProfileDisplayConfig: Codable, Equatable {
         self.usePaceColoring = usePaceColoring
         self.showRemainingPercentage = showRemainingPercentage
         self.showActiveProfileIndicator = showActiveProfileIndicator
+        self.combineIntoSingleIcon = combineIntoSingleIcon
+        self.menuBarProfileId = menuBarProfileId
     }
 
     // MARK: - Codable (Custom decoder for backwards compatibility)
@@ -328,6 +334,8 @@ struct MultiProfileDisplayConfig: Codable, Equatable {
         case usePaceColoring
         case showRemainingPercentage
         case showActiveProfileIndicator
+        case combineIntoSingleIcon
+        case menuBarProfileId
     }
 
     init(from decoder: Decoder) throws {
@@ -343,6 +351,8 @@ struct MultiProfileDisplayConfig: Codable, Equatable {
         usePaceColoring = try container.decodeIfPresent(Bool.self, forKey: .usePaceColoring) ?? false
         showRemainingPercentage = try container.decodeIfPresent(Bool.self, forKey: .showRemainingPercentage) ?? false
         showActiveProfileIndicator = try container.decodeIfPresent(Bool.self, forKey: .showActiveProfileIndicator) ?? false
+        combineIntoSingleIcon = try container.decodeIfPresent(Bool.self, forKey: .combineIntoSingleIcon) ?? true
+        menuBarProfileId = try container.decodeIfPresent(UUID.self, forKey: .menuBarProfileId)
     }
 
     static var `default`: MultiProfileDisplayConfig {

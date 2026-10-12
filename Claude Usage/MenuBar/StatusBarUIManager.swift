@@ -60,6 +60,26 @@ final class StatusBarUIManager {
     /// Well-known placeholder UUID used for the default logo in multi-profile mode
     private static let defaultLogoPlaceholderUUID = UUID(uuidString: "00000000-0000-0000-0000-000000000000")!
 
+    /// Key + autosaveName of the single status item used when multi-profile mode
+    /// combines everything into one icon. Fixed (not per profile) so switching the
+    /// profile it shows keeps the icon in place instead of creating a new item,
+    /// which macOS/Ice would park at a default position (e.g. behind Ice's bar).
+    private static let combinedItemUUID = UUID(uuidString: "00000000-0000-0000-0000-00000000C0B1")!
+    private static let combinedAutosaveName: NSStatusItem.AutosaveName = "\(autosavePrefix).multiProfile.combined"
+
+    /// When true, the (single) profile passed to the multi-profile methods is
+    /// rendered into the fixed combined status item.
+    var combinesIntoSingleItem = false
+
+    /// Status item key for a profile in multi-profile mode
+    private func itemKey(for profileId: UUID) -> UUID {
+        combinesIntoSingleItem ? Self.combinedItemUUID : profileId
+    }
+
+    private func itemAutosaveName(for profileId: UUID) -> NSStatusItem.AutosaveName {
+        combinesIntoSingleItem ? Self.combinedAutosaveName : Self.autosaveName(forProfileId: profileId)
+    }
+
     // MARK: - Initialization
 
     init() {}
@@ -247,7 +267,7 @@ final class StatusBarUIManager {
             // real (coarse-rounded, stable) width. No variable-width solve, no recursion.
             for profile in selectedProfiles {
                 let statusItem = NSStatusBar.system.statusItem(withLength: Self.multiProfilePlaceholderLength)
-                statusItem.autosaveName = Self.autosaveName(forProfileId: profile.id)
+                statusItem.autosaveName = itemAutosaveName(for: profile.id)
                 // Override any persisted false from a prior cmd-drag.
                 statusItem.isVisible = true
 
@@ -259,7 +279,7 @@ final class StatusBarUIManager {
                     LoggingService.shared.logWarning("Multi-profile status bar button is nil for \(profile.name) - screens: \(NSScreen.screens.count)")
                 }
 
-                multiProfileStatusItems[profile.id] = statusItem
+                multiProfileStatusItems[itemKey(for: profile.id)] = statusItem
             }
 
             LoggingService.shared.logUIEvent("Multi-profile: Created \(selectedProfiles.count) status items")
@@ -280,7 +300,7 @@ final class StatusBarUIManager {
         let selectedProfiles = profiles.filter { $0.isSelectedForDisplay }
         let newProfileIds: Set<UUID> = selectedProfiles.isEmpty
             ? [Self.defaultLogoPlaceholderUUID]
-            : Set(selectedProfiles.map { $0.id })
+            : Set(selectedProfiles.map { itemKey(for: $0.id) })
         let currentProfileIds = Set(multiProfileStatusItems.keys)
 
         // Step 1: Remove items that are no longer needed
@@ -316,11 +336,11 @@ final class StatusBarUIManager {
             multiProfileStatusItems[Self.defaultLogoPlaceholderUUID] = statusItem
             LoggingService.shared.logUIEvent("Multi-profile: Added default logo")
         } else {
-            for profile in selectedProfiles where idsToAdd.contains(profile.id) {
+            for profile in selectedProfiles where idsToAdd.contains(itemKey(for: profile.id)) {
                 // Fixed placeholder length (see setupMultiProfile) — avoids the macOS 26
                 // recursive variable-width solve; updateMultiProfileButtons pins the real width.
                 let statusItem = NSStatusBar.system.statusItem(withLength: Self.multiProfilePlaceholderLength)
-                statusItem.autosaveName = Self.autosaveName(forProfileId: profile.id)
+                statusItem.autosaveName = itemAutosaveName(for: profile.id)
                 // Override any persisted false from a prior cmd-drag.
                 statusItem.isVisible = true
                 if let button = statusItem.button {
@@ -328,7 +348,7 @@ final class StatusBarUIManager {
                     button.target = target
                     button.sendAction(on: [.leftMouseUp, .rightMouseUp])
                 }
-                multiProfileStatusItems[profile.id] = statusItem
+                multiProfileStatusItems[itemKey(for: profile.id)] = statusItem
                 LoggingService.shared.logUIEvent("Multi-profile: Added status item for profile \(profile.name)")
             }
         }
@@ -353,7 +373,7 @@ final class StatusBarUIManager {
         guard isMultiProfileMode else { return }
 
         for profile in profiles where profile.isSelectedForDisplay {
-            guard let statusItem = multiProfileStatusItems[profile.id],
+            guard let statusItem = multiProfileStatusItems[itemKey(for: profile.id)],
                   let button = statusItem.button else {
                 continue
             }
@@ -555,7 +575,7 @@ final class StatusBarUIManager {
 
     /// Get button for a specific profile (multi-profile mode)
     func button(for profileId: UUID) -> NSStatusBarButton? {
-        return multiProfileStatusItems[profileId]?.button
+        return multiProfileStatusItems[itemKey(for: profileId)]?.button
     }
 
     /// Find which profile ID owns the given button (multi-profile mode)
