@@ -295,6 +295,8 @@ struct MultiProfileDisplayConfig: Codable, Equatable {
     var showActiveProfileIndicator: Bool // If true, show a green underline on the active profile's icon
     var combineIntoSingleIcon: Bool // If true, show one menu bar icon and stack all selected profiles in its popover
     var menuBarProfileId: UUID?     // Profile whose usage drives the single combined icon (nil = active profile)
+    var followClaudeCode: Bool      // If true, the combined icon shows the profile Claude Code is currently using
+    var claudeCodeFolders: [String: String] // Profile UUID string -> Claude Code config folder it uses
 
     init(
         iconStyle: MultiProfileIconStyle = .concentric,
@@ -307,7 +309,9 @@ struct MultiProfileDisplayConfig: Codable, Equatable {
         showRemainingPercentage: Bool = false,
         showActiveProfileIndicator: Bool = false,
         combineIntoSingleIcon: Bool = true,
-        menuBarProfileId: UUID? = nil
+        menuBarProfileId: UUID? = nil,
+        followClaudeCode: Bool = false,
+        claudeCodeFolders: [String: String] = [:]
     ) {
         self.iconStyle = iconStyle
         self.showWeek = showWeek
@@ -320,6 +324,8 @@ struct MultiProfileDisplayConfig: Codable, Equatable {
         self.showActiveProfileIndicator = showActiveProfileIndicator
         self.combineIntoSingleIcon = combineIntoSingleIcon
         self.menuBarProfileId = menuBarProfileId
+        self.followClaudeCode = followClaudeCode
+        self.claudeCodeFolders = claudeCodeFolders
     }
 
     // MARK: - Codable (Custom decoder for backwards compatibility)
@@ -336,6 +342,8 @@ struct MultiProfileDisplayConfig: Codable, Equatable {
         case showActiveProfileIndicator
         case combineIntoSingleIcon
         case menuBarProfileId
+        case followClaudeCode
+        case claudeCodeFolders
     }
 
     init(from decoder: Decoder) throws {
@@ -353,6 +361,8 @@ struct MultiProfileDisplayConfig: Codable, Equatable {
         showActiveProfileIndicator = try container.decodeIfPresent(Bool.self, forKey: .showActiveProfileIndicator) ?? false
         combineIntoSingleIcon = try container.decodeIfPresent(Bool.self, forKey: .combineIntoSingleIcon) ?? true
         menuBarProfileId = try container.decodeIfPresent(UUID.self, forKey: .menuBarProfileId)
+        followClaudeCode = try container.decodeIfPresent(Bool.self, forKey: .followClaudeCode) ?? false
+        claudeCodeFolders = try container.decodeIfPresent([String: String].self, forKey: .claudeCodeFolders) ?? [:]
     }
 
     static var `default`: MultiProfileDisplayConfig {

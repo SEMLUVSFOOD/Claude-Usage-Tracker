@@ -239,6 +239,9 @@ class MenuBarManager: NSObject, ObservableObject {
         // Setup global keyboard shortcuts
         setupShortcuts()
 
+        // Track which Claude Code config folder is in use ("Follow Claude Code")
+        ClaudeCodeFollowService.shared.start()
+
     }
 
     private func setupShortcuts() {

@@ -173,10 +173,15 @@ class ProfileManager: ObservableObject {
         displayMode == .multi && multiProfileConfig.combineIntoSingleIcon
     }
 
-    /// The selected profile whose usage drives the single combined icon:
-    /// the user's explicit choice, else the active profile, else the first selected.
+    /// The selected profile whose usage drives the single combined icon: the
+    /// profile Claude Code is using (when following it), else the user's explicit
+    /// choice, else the active profile, else the first selected.
     var menuBarProfile: Profile? {
         let selected = profiles.filter { $0.isSelectedForDisplay }
+        if let followed = followedClaudeCodeProfile,
+           let match = selected.first(where: { $0.id == followed.id }) {
+            return match
+        }
         if let id = multiProfileConfig.menuBarProfileId,
            let chosen = selected.first(where: { $0.id == id }) {
             return chosen
@@ -194,12 +199,46 @@ class ProfileManager: ObservableObject {
         return [first] + selected.filter { $0.id != first.id }
     }
 
+    /// Profile Claude Code currently uses, when "Follow Claude Code" is on.
+    var followedClaudeCodeProfile: Profile? {
+        guard multiProfileConfig.followClaudeCode else { return nil }
+        return ClaudeCodeFollowService.shared.followedProfile(in: profiles, config: multiProfileConfig)
+    }
+
+    /// Turns following the Claude Code account on/off. Off keeps the icon on
+    /// whatever profile it shows right now, with no further automatic switching.
+    func setFollowClaudeCode(_ follow: Bool) {
+        var config = multiProfileConfig
+        if !follow, let shown = menuBarProfile {
+            config.menuBarProfileId = shown.id
+        }
+        config.followClaudeCode = follow
+        multiProfileConfig = config
+        profileStore.saveMultiProfileConfig(config)
+        NotificationCenter.default.post(name: .multiProfileConfigChanged, object: nil)
+    }
+
+    /// Links a profile to the Claude Code config folder it uses (nil = automatic).
+    func setClaudeCodeFolder(_ path: String?, for profileId: UUID) {
+        var config = multiProfileConfig
+        // A folder belongs to one profile
+        if let path = path {
+            config.claudeCodeFolders = config.claudeCodeFolders.filter { $0.value != path }
+        }
+        config.claudeCodeFolders[profileId.uuidString] = path
+        multiProfileConfig = config
+        profileStore.saveMultiProfileConfig(config)
+        NotificationCenter.default.post(name: .multiProfileConfigChanged, object: nil)
+    }
+
     /// Chooses which profile the combined menu bar icon shows. Does not switch
     /// the active profile (that would swap Claude Code CLI credentials).
     func setMenuBarProfile(_ id: UUID) {
         guard multiProfileConfig.menuBarProfileId != id || menuBarProfile?.id != id else { return }
         var config = multiProfileConfig
         config.menuBarProfileId = id
+        // Picking an account by hand stops following Claude Code
+        config.followClaudeCode = false
         multiProfileConfig = config
         profileStore.saveMultiProfileConfig(config)
         NotificationCenter.default.post(name: .multiProfileConfigChanged, object: nil)

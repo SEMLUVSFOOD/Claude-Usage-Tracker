@@ -61,6 +61,11 @@ struct SetupWizardView: View {
                         setupMode = .loading
                     case .codex:
                         setupMode = .codexSetup
+                    case .antigravity:
+                        // Signing in happens from the dropdown / Settings
+                        applyProvider(.antigravity)
+                        NotificationCenter.default.post(name: .credentialsChanged, object: nil)
+                        dismiss()
                     }
                 },
                 onSkip: { dismiss() }
@@ -1068,7 +1073,9 @@ struct ProviderChoiceSetupView: View {
                                     .font(.system(size: 14, weight: .semibold))
                                 Text(provider == .anthropic
                                      ? "setup.choose_provider.anthropic_hint".localized
-                                     : "setup.choose_provider.codex_hint".localized)
+                                     : provider == .codex
+                                        ? "setup.choose_provider.codex_hint".localized
+                                        : "Gemini and Claude/GPT limits in Antigravity")
                                     .font(.system(size: 11))
                                     .foregroundColor(.secondary)
                                     .multilineTextAlignment(.center)

@@ -14,6 +14,7 @@ import Foundation
 enum Provider: String, Codable, CaseIterable, Equatable {
     case anthropic
     case codex
+    case antigravity
 
     var descriptor: ProviderDescriptor {
         ProviderRegistry.descriptor(for: self)

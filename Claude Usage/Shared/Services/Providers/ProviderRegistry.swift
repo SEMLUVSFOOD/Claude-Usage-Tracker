@@ -56,6 +56,25 @@ enum ProviderRegistry {
             primaryWindowLabelKey: "usage.window.session",
             secondaryWindowLabelKey: "usage.window.weekly"
         ),
+        .antigravity: ProviderDescriptor(
+            id: .antigravity,
+            displayName: "Google Antigravity",
+            logoAssetName: "ProviderLogoGoogle",
+            logoSystemSymbolFallback: "sparkles",
+            statusPageURL: nil,
+            capabilities: ProviderCapabilities(
+                tokenCounts: false,
+                perModelBreakdown: false,
+                consoleBilling: false,
+                cliAccountSync: false,
+                autoStartSession: false,
+                overageChecks: false,
+                credits: false
+            ),
+            credentialSections: [.antigravityAccount],
+            primaryWindowLabelKey: "usage.window.session",
+            secondaryWindowLabelKey: "usage.window.weekly"
+        ),
     ]
 
     static func descriptor(for provider: Provider) -> ProviderDescriptor {
@@ -73,6 +92,8 @@ enum ProviderRegistry {
             return AnthropicUsageProvider.shared
         case .codex:
             return CodexUsageProvider.shared
+        case .antigravity:
+            return AntigravityUsageProvider.shared
         }
     }
 }

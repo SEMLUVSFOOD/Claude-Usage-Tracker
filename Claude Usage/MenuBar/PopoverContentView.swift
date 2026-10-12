@@ -68,6 +68,7 @@ struct PopoverContentView: View {
     // the window-resize loop.
     @State private var appeared = false
     @StateObject private var profileManager = ProfileManager.shared
+    @ObservedObject private var followService = ClaudeCodeFollowService.shared
 
     // Computed properties for multi-profile mode support
     private var displayUsage: ClaudeUsage {
@@ -165,7 +166,6 @@ struct PopoverContentView: View {
                     }
                     ProfileUsageTag(
                         profile: profile,
-                        isActive: profile.id == profileManager.activeProfile?.id,
                         menuBarSelection: profiles.count > 1
                             ? (profile.id == menuBarProfileId ? .shown : .selectable)
                             : nil,
@@ -179,10 +179,25 @@ struct PopoverContentView: View {
                             onPreferences: onPreferences
                         )) : nil
                     )
-                    SmartUsageDashboard(
-                        usage: profile.claudeUsage ?? .empty,
-                        apiUsage: profile.apiUsage,
-                        provider: profile.provider
+                    if profile.provider == .antigravity && !profile.hasUsageCredentials {
+                        AntigravitySignInCard(profileId: profile.id)
+                    } else {
+                        SmartUsageDashboard(
+                            usage: profile.claudeUsage ?? .empty,
+                            apiUsage: profile.apiUsage,
+                            provider: profile.provider
+                        )
+                    }
+                }
+
+                if profiles.count > 1 {
+                    PopoverDivider()
+                        .padding(.top, 6)
+                    FollowClaudeCodeToggle(
+                        isOn: profileManager.multiProfileConfig.followClaudeCode,
+                        folderName: followService.currentFolder?.name,
+                        isLinked: profileManager.followedClaudeCodeProfile != nil,
+                        onChange: { profileManager.setFollowClaudeCode($0) }
                     )
                 }
             } else {
@@ -191,10 +206,7 @@ struct PopoverContentView: View {
                    let viewingProfile = manager.clickedProfileId.flatMap({ id in
                        profileManager.profiles.first(where: { $0.id == id })
                    }) ?? profileManager.activeProfile {
-                    ProfileUsageTag(
-                        profile: viewingProfile,
-                        isActive: viewingProfile.id == profileManager.activeProfile?.id
-                    )
+                    ProfileUsageTag(profile: viewingProfile)
                 }
 
                 // Usage
@@ -235,7 +247,6 @@ struct ProfileUsageTag: View {
     }
 
     let profile: Profile
-    let isActive: Bool
     var menuBarSelection: MenuBarSelection? = nil
     var onShowInMenuBar: () -> Void = {}
     /// Extra controls at the trailing edge (combined mode: refresh/settings)
@@ -243,52 +254,16 @@ struct ProfileUsageTag: View {
 
     @State private var isHovered = false
 
-    private var initials: String {
-        let words = profile.name.split(separator: " ")
-        if words.count >= 2 {
-            return String(words[0].prefix(1) + words[1].prefix(1)).uppercased()
-        } else if let first = words.first {
-            return String(first.prefix(2)).uppercased()
-        }
-        return "?"
-    }
-
     var body: some View {
         let row = HStack(spacing: 8) {
-            // Profile initials avatar
-            ZStack {
-                Circle()
-                    .fill(Color.accentColor.opacity(0.15))
-                    .frame(width: 20, height: 20)
-
-                Text(initials)
-                    .font(.system(size: 8, weight: .bold, design: .rounded))
-                    .foregroundColor(.accentColor)
-            }
+            ProviderBrandMark(provider: profile.provider, size: 20)
 
             Text(profile.name)
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundColor(.primary)
                 .lineLimit(1)
 
-            if profile.provider != .anthropic {
-                ProviderLogoView(provider: profile.provider, size: 10)
-                    .foregroundColor(.secondary)
-            }
-
             Spacer()
-
-            if isActive {
-                Text("Active")
-                    .font(.system(size: 8, weight: .semibold))
-                    .foregroundColor(.accentColor)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 2)
-                    .background(
-                        Capsule()
-                            .fill(Color.accentColor.opacity(0.12))
-                    )
-            }
 
             switch menuBarSelection {
             case .shown:
@@ -332,6 +307,123 @@ struct ProfileUsageTag: View {
         } else {
             row
         }
+    }
+}
+
+// MARK: - Provider Brand Mark
+
+/// Colored provider logo used as the profile avatar in the dropdown. Drawn in
+/// code (the asset catalog has no provider logos): Claude's coral starburst and
+/// Gemini's gradient four-point star; other providers fall back to their symbol.
+struct ProviderBrandMark: View {
+    let provider: Provider
+    var size: CGFloat = 20
+
+    var body: some View {
+        switch provider {
+        case .anthropic:
+            ClaudeStarburst()
+                .stroke(Color(red: 0.85, green: 0.47, blue: 0.34),
+                        style: StrokeStyle(lineWidth: size * 0.11, lineCap: .round))
+                .frame(width: size * 0.82, height: size * 0.82)
+                .frame(width: size, height: size)
+        case .antigravity:
+            GeminiStar()
+                .fill(LinearGradient(
+                    colors: [Color(red: 0.11, green: 0.49, blue: 1.0),
+                             Color(red: 0.61, green: 0.45, blue: 0.80),
+                             Color(red: 0.85, green: 0.42, blue: 0.47)],
+                    startPoint: .bottomLeading,
+                    endPoint: .topTrailing
+                ))
+                .frame(width: size * 0.9, height: size * 0.9)
+                .frame(width: size, height: size)
+        case .codex:
+            ProviderLogoView(provider: provider, size: size * 0.8)
+                .foregroundColor(.primary)
+                .frame(width: size, height: size)
+        }
+    }
+}
+
+/// Rays radiating from the center with slightly varying lengths.
+private struct ClaudeStarburst: Shape {
+    func path(in rect: CGRect) -> Path {
+        let center = CGPoint(x: rect.midX, y: rect.midY)
+        let radius = min(rect.width, rect.height) / 2
+        let lengths: [CGFloat] = [1.0, 0.78, 0.92, 0.72, 0.98, 0.8, 0.9, 0.74, 1.0, 0.82, 0.88, 0.76]
+        var path = Path()
+        for (index, length) in lengths.enumerated() {
+            let angle = CGFloat(index) / CGFloat(lengths.count) * 2 * .pi - .pi / 2
+            let inner = radius * 0.12
+            path.move(to: CGPoint(x: center.x + cos(angle) * inner, y: center.y + sin(angle) * inner))
+            path.addLine(to: CGPoint(x: center.x + cos(angle) * radius * length,
+                                     y: center.y + sin(angle) * radius * length))
+        }
+        return path
+    }
+}
+
+/// Four-point star with concave sides.
+private struct GeminiStar: Shape {
+    func path(in rect: CGRect) -> Path {
+        let c = CGPoint(x: rect.midX, y: rect.midY)
+        var path = Path()
+        path.move(to: CGPoint(x: c.x, y: rect.minY))
+        path.addQuadCurve(to: CGPoint(x: rect.maxX, y: c.y), control: c)
+        path.addQuadCurve(to: CGPoint(x: c.x, y: rect.maxY), control: c)
+        path.addQuadCurve(to: CGPoint(x: rect.minX, y: c.y), control: c)
+        path.addQuadCurve(to: CGPoint(x: c.x, y: rect.minY), control: c)
+        path.closeSubpath()
+        return path
+    }
+}
+
+// MARK: - Follow Claude Code Toggle
+
+/// Footer switch in combined mode: when on, the menu bar icon shows whichever
+/// account Claude Code is using (as set by e.g. the VS Code profile switcher).
+struct FollowClaudeCodeToggle: View {
+    let isOn: Bool
+    let folderName: String?
+    let isLinked: Bool
+    let onChange: (Bool) -> Void
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: "link")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(isOn ? .accentColor : .secondary)
+
+            Text("Follow Claude Code")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(.primary)
+
+            if isOn {
+                if isLinked, let folderName = folderName {
+                    Text(folderName)
+                        .font(.system(size: 10))
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                } else {
+                    Text("not linked")
+                        .font(.system(size: 10))
+                        .foregroundColor(.orange)
+                        .help("Link this Claude Code folder to a profile in Settings → Manage Profiles")
+                }
+            }
+
+            Spacer()
+
+            Toggle("", isOn: Binding(get: { isOn }, set: onChange))
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .labelsHidden()
+                .focusEffectDisabled()
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 8)
+        .help("Show the account Claude Code is currently using in the menu bar")
     }
 }
 

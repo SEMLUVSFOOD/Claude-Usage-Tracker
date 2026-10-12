@@ -110,6 +110,11 @@ class ProfileStore {
                 } else {
                     profiles[i].codexCredentialsJSON = keychainService.loadProfileSecret(profileId: id, field: .codexCredentialsJSON)
                 }
+                if profiles[i].antigravityCredentialsJSON != nil {
+                    plistHadSecrets = true
+                } else {
+                    profiles[i].antigravityCredentialsJSON = keychainService.loadProfileSecret(profileId: id, field: .antigravityCredentialsJSON)
+                }
             }
 
             if plistHadSecrets {
@@ -136,6 +141,7 @@ class ProfileStore {
         ok = persistSecret(profile.apiSessionKey, profile.id, .apiSessionKey) && ok
         ok = persistSecret(profile.cliCredentialsJSON, profile.id, .cliCredentialsJSON) && ok
         ok = persistSecret(profile.codexCredentialsJSON, profile.id, .codexCredentialsJSON) && ok
+        ok = persistSecret(profile.antigravityCredentialsJSON, profile.id, .antigravityCredentialsJSON) && ok
         return ok
     }
 

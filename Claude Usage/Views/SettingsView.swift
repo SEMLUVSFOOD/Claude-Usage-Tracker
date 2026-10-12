@@ -288,6 +288,8 @@ struct SettingsView: View {
                     CLIAccountView()
                 case .codexAccount:
                     CodexAccountView()
+                case .antigravityAccount:
+                    AntigravityAccountView()
 
                 // Profile Settings
                 case .appearance:
@@ -605,6 +607,7 @@ enum SettingsSection: String, CaseIterable {
     case apiConsole
     case cliAccount
     case codexAccount
+    case antigravityAccount
 
     // Profile Settings
     case appearance
@@ -631,6 +634,7 @@ enum SettingsSection: String, CaseIterable {
         case .apiConsole: return "section.api_console_title".localized
         case .cliAccount: return "section.cli_account_title".localized
         case .codexAccount: return "section.codex_account_title".localized
+        case .antigravityAccount: return "Google Account"
         case .appearance: return "section.appearance_title".localized
         case .general: return "section.general_title".localized
         case .history: return "section.history_title".localized
@@ -655,6 +659,7 @@ enum SettingsSection: String, CaseIterable {
         case .apiConsole: return "dollarsign.circle.fill"
         case .cliAccount: return "terminal.fill"
         case .codexAccount: return "terminal.fill"
+        case .antigravityAccount: return "person.badge.key.fill"
         case .appearance: return "paintbrush.fill"
         case .general: return "gearshape.fill"
         case .history: return "chart.bar.xaxis"
@@ -679,6 +684,7 @@ enum SettingsSection: String, CaseIterable {
         case .apiConsole: return "section.api_console_desc".localized
         case .cliAccount: return "section.cli_account_desc".localized
         case .codexAccount: return "section.codex_account_desc".localized
+        case .antigravityAccount: return "Sign in with Google for Antigravity usage"
         case .appearance: return "section.appearance_desc".localized
         case .general: return "section.general_desc".localized
         case .history: return "section.history_desc".localized
@@ -708,7 +714,7 @@ enum SettingsSection: String, CaseIterable {
 
     var isCredential: Bool {
         switch self {
-        case .claudeAI, .apiConsole, .cliAccount, .codexAccount:
+        case .claudeAI, .apiConsole, .cliAccount, .codexAccount, .antigravityAccount:
             return true
         default:
             return false
@@ -824,6 +830,7 @@ struct ProfileCredentialCardsRow: View {
         case .apiConsole: return "API Console"
         case .cliAccount: return "CLI Account"
         case .codexAccount: return "Codex CLI"
+        case .antigravityAccount: return "Google"
         default: return section.title
         }
     }
@@ -834,6 +841,7 @@ struct ProfileCredentialCardsRow: View {
         case .apiConsole: return credentials?.apiSessionKey != nil
         case .cliAccount: return profileManager.activeProfile?.hasCliAccount ?? false
         case .codexAccount: return profileManager.activeProfile?.hasUsageCredentials ?? false
+        case .antigravityAccount: return profileManager.activeProfile?.hasUsageCredentials ?? false
         default: return false
         }
     }

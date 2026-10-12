@@ -254,6 +254,11 @@ struct ManageProfilesView: View {
                                 )
                             )
 
+                            // Claude Code folder per profile ("Follow Claude Code" in the dropdown)
+                            if profileManager.multiProfileConfig.combineIntoSingleIcon {
+                                ClaudeCodeFolderLinks()
+                            }
+
                             // Show Active Profile Indicator Toggle
                             SettingToggle(
                                 title: "multiprofile.active_indicator_title".localized,
@@ -629,5 +634,54 @@ struct ProviderLogoView: View {
                 .font(.system(size: size * 0.85, weight: .medium))
                 .frame(width: size, height: size)
         }
+    }
+}
+
+// MARK: - Claude Code Folder Links
+
+/// Links each profile to the Claude Code config folder it logs in with, so the
+/// dropdown's "Follow Claude Code" switch knows which profile to show.
+private struct ClaudeCodeFolderLinks: View {
+    @StateObject private var profileManager = ProfileManager.shared
+    @ObservedObject private var followService = ClaudeCodeFollowService.shared
+
+    var body: some View {
+        let folders = followService.availableFolders()
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Claude Code folders")
+                .font(DesignTokens.Typography.body)
+                .fontWeight(.medium)
+            Text("Used by \"Follow Claude Code\" in the dropdown. Automatic matches by login email or name (e.g. Werk → Work).")
+                .font(DesignTokens.Typography.caption)
+                .foregroundColor(.secondary)
+
+            ForEach(profileManager.profiles.filter { $0.provider == .anthropic && $0.isSelectedForDisplay }) { profile in
+                HStack {
+                    Text(profile.name)
+                        .font(DesignTokens.Typography.caption)
+                    Spacer()
+                    Picker("", selection: Binding(
+                        get: { profileManager.multiProfileConfig.claudeCodeFolders[profile.id.uuidString] ?? "" },
+                        set: { profileManager.setClaudeCodeFolder($0.isEmpty ? nil : $0, for: profile.id) }
+                    )) {
+                        Text(automaticLabel(for: profile, folders: folders)).tag("")
+                        ForEach(folders) { folder in
+                            Text("\(folder.name) (\((folder.path as NSString).abbreviatingWithTildeInPath))").tag(folder.path)
+                        }
+                    }
+                    .labelsHidden()
+                    .frame(maxWidth: 260)
+                }
+            }
+        }
+        .padding(.top, DesignTokens.Spacing.small)
+    }
+
+    private func automaticLabel(for profile: Profile, folders: [ClaudeCodeFollowService.Folder]) -> String {
+        let config = profileManager.multiProfileConfig
+        let match = folders.first {
+            followService.profile(for: $0, in: profileManager.profiles, config: config)?.id == profile.id
+        }
+        return match.map { "Automatic (\($0.name))" } ?? "Automatic (no match)"
     }
 }

@@ -30,6 +30,10 @@ struct Profile: Codable, Identifiable, Equatable {
     /// the Keychain, excluded from the plist like the other credential fields.
     var codexCredentialsJSON: String?
 
+    /// Google sign-in tokens for the Antigravity provider (from "Sign in with
+    /// Google" in settings). Secret — stored in the Keychain like the others.
+    var antigravityCredentialsJSON: String?
+
     // MARK: - CLI Account Sync Metadata
     var hasCliAccount: Bool
     var cliAccountSyncedAt: Date?
@@ -146,6 +150,7 @@ struct Profile: Codable, Identifiable, Equatable {
         case apiSessionKey, apiOrganizationId, apiSessionKeyExpiry
         case cliCredentialsJSON
         case codexCredentialsJSON
+        case antigravityCredentialsJSON
         case hasCliAccount, cliAccountSyncedAt
         case customKeychainServiceName
         case terminalLauncherSlug
@@ -175,6 +180,7 @@ struct Profile: Codable, Identifiable, Equatable {
         apiSessionKeyExpiry = try c.decodeIfPresent(Date.self, forKey: .apiSessionKeyExpiry)
         cliCredentialsJSON = try c.decodeIfPresent(String.self, forKey: .cliCredentialsJSON)
         codexCredentialsJSON = try c.decodeIfPresent(String.self, forKey: .codexCredentialsJSON)
+        antigravityCredentialsJSON = try c.decodeIfPresent(String.self, forKey: .antigravityCredentialsJSON)
         hasCliAccount = try c.decodeIfPresent(Bool.self, forKey: .hasCliAccount) ?? false
         cliAccountSyncedAt = try c.decodeIfPresent(Date.self, forKey: .cliAccountSyncedAt)
         customKeychainServiceName = try c.decodeIfPresent(String.self, forKey: .customKeychainServiceName)
@@ -207,6 +213,7 @@ struct Profile: Codable, Identifiable, Equatable {
             try c.encodeIfPresent(apiSessionKey, forKey: .apiSessionKey)
             try c.encodeIfPresent(cliCredentialsJSON, forKey: .cliCredentialsJSON)
             try c.encodeIfPresent(codexCredentialsJSON, forKey: .codexCredentialsJSON)
+            try c.encodeIfPresent(antigravityCredentialsJSON, forKey: .antigravityCredentialsJSON)
         }
         try c.encodeIfPresent(organizationId, forKey: .organizationId)
         try c.encodeIfPresent(apiOrganizationId, forKey: .apiOrganizationId)
@@ -247,6 +254,8 @@ struct Profile: Codable, Identifiable, Equatable {
             return hasClaudeAI || hasAPIConsole || hasValidCLIOAuth
         case .codex:
             return codexCredentialsJSON != nil || CodexAuthService.shared.authFileExists()
+        case .antigravity:
+            return antigravityCredentialsJSON != nil
         }
     }
 
@@ -262,6 +271,8 @@ struct Profile: Codable, Identifiable, Equatable {
             return hasClaudeAI || hasAPIConsole || cliCredentialsJSON != nil || customKeychainServiceName != nil
         case .codex:
             return codexCredentialsJSON != nil || CodexAuthService.shared.authFileExists()
+        case .antigravity:
+            return antigravityCredentialsJSON != nil
         }
     }
 }
