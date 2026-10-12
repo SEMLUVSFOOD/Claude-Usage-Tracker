@@ -80,8 +80,6 @@ extension ClaudeAPIService {
 
         struct AutoReloadSettings: Codable {
             let enabled: Bool?
-            let threshold: Int?
-            let reloadAmount: Int?
         }
     }
 

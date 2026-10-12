@@ -105,8 +105,10 @@ final class MenuBarManager: NSObject, ObservableObject {
         isRefreshing = true
 
         Task {
-            if let newStatus = try? await statusService.fetchStatus() {
-                status = newStatus
+            if let statusService {
+                if let newStatus = try? await statusService.fetchStatus() { status = newStatus }
+            } else {
+                status = .unknown
             }
             var anySuccess = false
             for profile in profiles {
@@ -125,12 +127,10 @@ final class MenuBarManager: NSObject, ObservableObject {
         }
     }
 
-    /// Status page of the provider shown in the menu bar (Anthropic by default).
-    private var statusService: ClaudeStatusService {
-        if let url = profileManager.menuBarProfile?.provider.descriptor.statusPageURL {
-            return ClaudeStatusService(statusURL: url)
-        }
-        return ClaudeStatusService()
+    /// Status page of the provider shown in the menu bar (nil when it has none).
+    private var statusService: ClaudeStatusService? {
+        guard let profile = profileManager.menuBarProfile else { return ClaudeStatusService() }
+        return profile.provider.descriptor.statusPageURL.map { ClaudeStatusService(statusURL: $0) }
     }
 
     // MARK: - Icon

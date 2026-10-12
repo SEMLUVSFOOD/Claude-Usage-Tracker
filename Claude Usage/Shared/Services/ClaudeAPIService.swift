@@ -93,13 +93,11 @@ class ClaudeAPIService {
             request.httpMethod = "GET"
             request.timeoutInterval = 30
 
-            let startTime = Date()
             let (data, response): (Data, URLResponse)
             do {
                 (data, response) = try await URLSession.shared.data(for: request)
             } catch {
                 // Network errors
-                let duration = Date().timeIntervalSince(startTime)
 
                 let appError = AppError(
                     code: .networkGenericError,
@@ -113,7 +111,6 @@ class ClaudeAPIService {
                 throw appError
             }
 
-            let duration = Date().timeIntervalSince(startTime)
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw AppError(
@@ -305,13 +302,11 @@ class ClaudeAPIService {
 
         LoggingService.shared.logAPIRequest(endpoint)
 
-        let startTime = Date()
         let (data, response): (Data, URLResponse)
         do {
             (data, response) = try await URLSession.shared.data(for: request)
         } catch {
             // Network-level errors
-            let duration = Date().timeIntervalSince(startTime)
 
             LoggingService.shared.logAPIError(endpoint, error: error)
             let appError = AppError(
@@ -325,7 +320,6 @@ class ClaudeAPIService {
             throw appError
         }
 
-        let duration = Date().timeIntervalSince(startTime)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw AppError(

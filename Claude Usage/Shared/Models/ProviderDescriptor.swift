@@ -8,15 +8,12 @@
 import Foundation
 
 /// Declarative single source of truth for everything the app needs to know
-/// about a provider: branding, status page, capabilities, and which settings
-/// sections it exposes. UI and services gate on `capabilities`, never on
-/// `provider == .codex`-style equality checks, so new providers require no
-/// edits outside their own descriptor + implementation folder.
+/// about a provider: branding, status page, capabilities, and which sign-in
+/// pages it offers in Settings.
 struct ProviderDescriptor {
     let id: Provider
 
-    /// Brand name shown in pickers, badges, and notifications. Brand names
-    /// are not localized.
+    /// Brand name shown in pickers and settings. Brand names are not localized.
     let displayName: String
 
     /// Asset catalog image for the provider mark; SF Symbol used as fallback.
@@ -28,41 +25,14 @@ struct ProviderDescriptor {
 
     let capabilities: ProviderCapabilities
 
-    /// Credential settings sections this provider exposes in the sidebar.
+    /// Sign-in pages this provider offers in Settings.
     let credentialSections: [SettingsSection]
-
-    /// Localization keys for the two usage-window section labels.
-    let primaryWindowLabelKey: String
-    let secondaryWindowLabelKey: String
 }
 
-/// Capability flags that gate provider-specific features. Every gate in the
-/// app reads one of these flags; a capability being `false` must cleanly
-/// hide/no-op the feature (never throw).
+/// Capability flags that gate provider-specific behavior.
 struct ProviderCapabilities {
-    /// Provider reports token counts, not just percentages. Gates
-    /// `WeekDisplayMode.tokens` in the menu bar and token columns in CSV export.
-    let tokenCounts: Bool
-
-    /// Provider reports per-model weekly breakdowns (Opus/Sonnet/…). Gates
-    /// per-model popover cards and model-specific notifications.
-    let perModelBreakdown: Bool
-
-    /// Provider has a billing/console API. Gates the `.apiConsole` settings
-    /// section, the API usage card, the `.api` menu bar metric, and billing history.
-    let consoleBilling: Bool
-
-    /// Provider has a local CLI account this app syncs with on profile switch.
-    /// Gates the `activateProfile` credential sync, statusline scripts, and the
-    /// `.cliAccount`/`.claudeCode` settings sections.
+    /// The provider's accounts are Claude Code logins: they can be linked to
+    /// Claude Code config folders ("Follow Claude Code") and use Claude Code's
+    /// keychain login as a credential fallback.
     let cliAccountSync: Bool
-
-    /// Provider supports auto-starting a usage window by sending a message.
-    let autoStartSession: Bool
-
-    /// Provider supports overage/extra-usage spend checks.
-    let overageChecks: Bool
-
-    /// Provider reports a prepaid credits balance.
-    let credits: Bool
 }

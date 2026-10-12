@@ -146,11 +146,14 @@ final class ProfileProviderTests: XCTestCase {
     }
 
     func testCapabilityExpectations() {
-        XCTAssertTrue(Provider.anthropic.descriptor.capabilities.tokenCounts)
         XCTAssertTrue(Provider.anthropic.descriptor.capabilities.cliAccountSync)
-        XCTAssertFalse(Provider.codex.descriptor.capabilities.tokenCounts)
         XCTAssertFalse(Provider.codex.descriptor.capabilities.cliAccountSync)
-        XCTAssertFalse(Provider.codex.descriptor.capabilities.autoStartSession)
-        XCTAssertTrue(Provider.codex.descriptor.capabilities.credits)
+        XCTAssertFalse(Provider.antigravity.descriptor.capabilities.cliAccountSync)
+    }
+
+    func testEveryProviderOffersASignInPage() {
+        for provider in Provider.allCases {
+            XCTAssertFalse(provider.descriptor.credentialSections.isEmpty)
+        }
     }
 }

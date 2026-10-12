@@ -44,7 +44,7 @@ enum PaceStatus: Int, Comparable, CaseIterable {
         }
     }
 
-    /// SwiftUI color for widgets and SwiftUI views
+    /// SwiftUI color for the pace marker
     var swiftUIColor: Color {
         switch self {
         case .comfortable: return .green

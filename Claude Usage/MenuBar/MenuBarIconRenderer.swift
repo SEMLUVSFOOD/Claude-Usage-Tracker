@@ -12,7 +12,7 @@ final class MenuBarIconRenderer {
 
     // MARK: - Multi-Profile Concentric Icon
 
-    /// Creates a compact concentric circle icon for multi-profile display mode
+    /// Creates a compact concentric circle icon
     /// - Parameters:
     ///   - sessionPercentage: Session usage percentage (0-100)
     ///   - weekPercentage: Week usage percentage (0-100)
@@ -158,7 +158,7 @@ final class MenuBarIconRenderer {
         return image
     }
 
-    /// Creates a concentric icon with profile label below for multi-profile mode
+    /// Creates a concentric icon with profile label below
     /// - Returns: NSImage with concentric circles and profile name label
     func createConcentricIconWithLabel(
         sessionPercentage: Double,
@@ -303,7 +303,7 @@ final class MenuBarIconRenderer {
 
     // MARK: - Multi-Profile Progress Bar Style
 
-    /// Creates a progress bar style icon for multi-profile mode
+    /// Creates a progress bar style icon
     func createMultiProfileProgressBar(
         sessionPercentage: Double,
         weekPercentage: Double?,
@@ -401,7 +401,7 @@ final class MenuBarIconRenderer {
 
     // MARK: - Multi-Profile Compact Dot Style
 
-    /// Creates a minimal dot indicator for multi-profile mode
+    /// Creates a minimal dot indicator
     func createCompactDot(
         percentage: Double,
         status: UsageStatusLevel,
@@ -512,7 +512,7 @@ final class MenuBarIconRenderer {
 
     // MARK: - Multi-Profile Percentage Style
 
-    /// Creates a percentage text icon for multi-profile mode
+    /// Creates a percentage text icon
     /// Format: "30 · 4" (session · week) with status colors, optional profile label below
     func createMultiProfilePercentage(
         sessionPercentage: Double,

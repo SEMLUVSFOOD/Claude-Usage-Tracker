@@ -54,7 +54,7 @@ enum MultiProfileIconStyle: String, Codable, CaseIterable {
     }
 }
 
-/// Configuration for multi-profile display mode
+/// How the menu bar icon looks, which account it shows, and Follow Claude Code
 struct MultiProfileDisplayConfig: Codable, Equatable {
     var iconStyle: MultiProfileIconStyle
     var showWeek: Bool        // If false, only show session

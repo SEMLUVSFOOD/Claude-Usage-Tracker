@@ -262,6 +262,8 @@ struct SettingsView: View {
 
                         Divider().padding(.vertical, 8).padding(.horizontal, 8)
 
+                        SidebarItem(icon: "chart.xyaxis.line", title: "Stats", description: "Usage history and charts per account",
+                                    isSelected: page == .stats) { open(.stats) }
                         SidebarItem(icon: "menubar.rectangle", title: "Menu bar icon", description: "Icon style and Follow Claude Code",
                                     isSelected: page == .menuBarIcon) { open(.menuBarIcon) }
                         SidebarItem(icon: "gearshape.fill", title: "General", description: "Launch at login",
@@ -284,6 +286,8 @@ struct SettingsView: View {
                     case .codexAccount: CodexAccountView()
                     case .antigravityAccount: AntigravityAccountView()
                     }
+                case .stats:
+                    StatsView()
                 case .menuBarIcon:
                     MenuBarIconSettingsView()
                 case .general:
@@ -341,6 +345,7 @@ struct SettingsView: View {
 enum SettingsPage: Hashable {
     case accounts
     case account(UUID, SettingsSection)
+    case stats
     case menuBarIcon
     case general
 }

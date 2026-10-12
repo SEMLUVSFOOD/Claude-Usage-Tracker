@@ -20,22 +20,12 @@ enum ProviderRegistry {
     private static let descriptors: [Provider: ProviderDescriptor] = [
         .anthropic: ProviderDescriptor(
             id: .anthropic,
-            displayName: "Anthropic",
+            displayName: "Claude",
             logoAssetName: "ProviderLogoAnthropic",
             logoSystemSymbolFallback: "sparkle",
             statusPageURL: URL(string: "https://status.claude.com/api/v2/status.json"),
-            capabilities: ProviderCapabilities(
-                tokenCounts: true,
-                perModelBreakdown: true,
-                consoleBilling: true,
-                cliAccountSync: true,
-                autoStartSession: true,
-                overageChecks: true,
-                credits: false
-            ),
-            credentialSections: [.claudeAI, .cliAccount],
-            primaryWindowLabelKey: "usage.window.session",
-            secondaryWindowLabelKey: "usage.window.weekly"
+            capabilities: ProviderCapabilities(cliAccountSync: true),
+            credentialSections: [.claudeAI, .cliAccount]
         ),
         .codex: ProviderDescriptor(
             id: .codex,
@@ -43,18 +33,8 @@ enum ProviderRegistry {
             logoAssetName: "ProviderLogoOpenAI",
             logoSystemSymbolFallback: "circle.hexagongrid",
             statusPageURL: URL(string: "https://status.openai.com/api/v2/status.json"),
-            capabilities: ProviderCapabilities(
-                tokenCounts: false,
-                perModelBreakdown: false,
-                consoleBilling: false,
-                cliAccountSync: false,
-                autoStartSession: false,
-                overageChecks: false,
-                credits: true
-            ),
-            credentialSections: [.codexAccount],
-            primaryWindowLabelKey: "usage.window.session",
-            secondaryWindowLabelKey: "usage.window.weekly"
+            capabilities: ProviderCapabilities(cliAccountSync: false),
+            credentialSections: [.codexAccount]
         ),
         .antigravity: ProviderDescriptor(
             id: .antigravity,
@@ -62,18 +42,8 @@ enum ProviderRegistry {
             logoAssetName: "ProviderLogoGoogle",
             logoSystemSymbolFallback: "sparkles",
             statusPageURL: nil,
-            capabilities: ProviderCapabilities(
-                tokenCounts: false,
-                perModelBreakdown: false,
-                consoleBilling: false,
-                cliAccountSync: false,
-                autoStartSession: false,
-                overageChecks: false,
-                credits: false
-            ),
-            credentialSections: [.antigravityAccount],
-            primaryWindowLabelKey: "usage.window.session",
-            secondaryWindowLabelKey: "usage.window.weekly"
+            capabilities: ProviderCapabilities(cliAccountSync: false),
+            credentialSections: [.antigravityAccount]
         ),
     ]
 

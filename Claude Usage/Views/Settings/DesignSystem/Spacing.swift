@@ -28,27 +28,21 @@ enum Spacing {
     static let xl: CGFloat = 20
 
     /// 24px - Extra large spacing
-    static let xxl: CGFloat = 24
 
     /// 32px - Maximum spacing for major sections
-    static let xxxl: CGFloat = 32
 
     // MARK: - Semantic Spacing
 
     /// Spacing between settings sections (20px)
-    static let sectionSpacing: CGFloat = 20
 
     /// Spacing between cards (16px)
-    static let cardSpacing: CGFloat = 16
 
     /// Spacing within cards (20px)
     static let cardPadding: CGFloat = 20
 
     /// Spacing for input fields (12px)
-    static let inputSpacing: CGFloat = 12
 
     /// Padding for input fields (12px)
-    static let inputPadding: CGFloat = 12
 
     /// Content padding from edges (28px)
     static let contentPadding: CGFloat = 28
@@ -59,33 +53,24 @@ enum Spacing {
     // MARK: - Component Spacing
 
     /// Spacing between toggle and description (4px)
-    static let toggleDescriptionSpacing: CGFloat = 4
 
     /// Spacing between icon and text (8px)
-    static let iconTextSpacing: CGFloat = 8
 
     /// Spacing between buttons in a row (10px)
-    static let buttonRowSpacing: CGFloat = 10
 
     /// Spacing in form rows (12px)
-    static let formRowSpacing: CGFloat = 12
 
     // MARK: - Radius
 
     /// Small corner radius (4px)
-    static let radiusSmall: CGFloat = 4
 
     /// Medium corner radius (6px)
-    static let radiusMedium: CGFloat = 6
 
     /// Standard corner radius (8px)
-    static let radiusStandard: CGFloat = 8
 
     /// Large corner radius for cards (12px)
-    static let radiusLarge: CGFloat = 12
 
     /// Extra large radius (16px)
-    static let radiusXLarge: CGFloat = 16
 }
 
 /// View modifiers for consistent spacing

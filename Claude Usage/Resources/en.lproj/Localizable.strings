@@ -190,11 +190,11 @@
 
 "cli.sync_from_code" = "Sync from Claude Code";
 
-"cli.benefit_1" = "Auto-switch Claude Code login with profiles";
+"cli.benefit_1" = "Track this account with its Claude Code login — no session key needed";
 
-"cli.benefit_2" = "Keep CLI and app accounts in sync";
+"cli.benefit_2" = "Pin a Claude Code keychain entry for logins in other config folders (e.g. ~/.claude-work)";
 
-"cli.benefit_3" = "Auto-refresh credentials on profile switch";
+"cli.benefit_3" = "Tokens refresh automatically; the app never changes your Claude Code login";
 
 /* ==================== */
 /* MARK: - Additional Keys */

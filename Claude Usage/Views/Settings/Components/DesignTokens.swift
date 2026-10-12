@@ -37,7 +37,6 @@ enum DesignTokens {
 
         /// Monospaced for keys/tokens
         static let monospaced = Font.system(size: 12, design: .monospaced)
-        static let monospacedSmall = Font.system(size: 11, design: .monospaced)
         static let captionMono = Font.system(size: 11, design: .monospaced)
     }
 

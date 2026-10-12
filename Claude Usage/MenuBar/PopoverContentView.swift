@@ -117,6 +117,8 @@ struct PopoverContentView: View {
                 )
                 if profile.provider == .antigravity && !profile.hasUsageCredentials {
                     AntigravitySignInCard(profileId: profile.id)
+                } else if !profileManager.canFetchUsage(for: profile) {
+                    NotSignedInCard(onOpenSettings: onPreferences)
                 } else {
                     SmartUsageDashboard(usage: profile.claudeUsage ?? .empty, provider: profile.provider)
                 }
@@ -165,8 +167,8 @@ struct PopoverContentView: View {
 
 // MARK: - Profile Usage Tag
 
-/// Avatar + name row that labels a profile's usage section in multi-profile mode.
-/// In combined mode it doubles as the control for choosing the menu bar profile.
+/// Avatar + name row that labels each account's section in the dropdown.
+/// It doubles as the control for choosing the menu bar account.
 struct ProfileUsageTag: View {
     enum MenuBarSelection {
         case shown       // This profile drives the menu bar icon
@@ -176,7 +178,7 @@ struct ProfileUsageTag: View {
     let profile: Profile
     var menuBarSelection: MenuBarSelection? = nil
     var onShowInMenuBar: () -> Void = {}
-    /// Extra controls at the trailing edge (combined mode: refresh/settings)
+    /// Extra controls at the trailing edge (top row: status, refresh, settings)
     var accessory: AnyView? = nil
 
     @State private var isHovered = false
@@ -234,6 +236,28 @@ struct ProfileUsageTag: View {
         } else {
             row
         }
+    }
+}
+
+// MARK: - Not Signed In
+
+/// Shown instead of empty 0% bars for an account without credentials.
+struct NotSignedInCard: View {
+    let onOpenSettings: () -> Void
+
+    var body: some View {
+        HStack {
+            Text("Not signed in")
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+            Spacer()
+            Button("Open Settings", action: onOpenSettings)
+                .controlSize(.small)
+        }
+        .padding(12)
+        .background(RoundedRectangle(cornerRadius: 8).fill(Color.primary.opacity(0.04)))
+        .padding(.horizontal, 10)
+        .padding(.top, 6)
     }
 }
 
@@ -308,7 +332,7 @@ private struct GeminiStar: Shape {
 
 // MARK: - Follow Claude Code Toggle
 
-/// Footer switch in combined mode: when on, the menu bar icon shows whichever
+/// Footer switch in the dropdown: when on, the menu bar icon shows whichever
 /// account Claude Code is using (as set by e.g. the VS Code profile switcher).
 struct FollowClaudeCodeToggle: View {
     let isOn: Bool
@@ -376,7 +400,7 @@ struct FollowClaudeCodeToggle: View {
 // MARK: - Combined Header Controls
 
 /// Service status dot + refresh + settings, shown on the top profile row in
-/// combined multi-profile mode (replaces the profile-switcher header).
+/// the dropdown.
 struct CombinedHeaderControls: View {
     let status: ClaudeStatus
     let isRefreshing: Bool

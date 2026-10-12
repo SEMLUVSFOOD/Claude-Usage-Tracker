@@ -435,18 +435,15 @@ final class AntigravityAuthService {
         }
 
         let port: UInt16 = try await withCheckedThrowingContinuation { continuation in
-            var resumed = false
+            let once = ResumeOnce()
             let previous = listener.stateUpdateHandler
             listener.stateUpdateHandler = { state in
                 previous?(state)
-                guard !resumed else { return }
                 switch state {
                 case .ready:
-                    resumed = true
-                    continuation.resume(returning: listener.port?.rawValue ?? 0)
+                    if once.claim() { continuation.resume(returning: listener.port?.rawValue ?? 0) }
                 case .failed(let error):
-                    resumed = true
-                    continuation.resume(throwing: error)
+                    if once.claim() { continuation.resume(throwing: error) }
                 default:
                     break
                 }
@@ -505,8 +502,23 @@ final class AntigravityAuthService {
         return String((0..<length).map { _ in chars.randomElement()! })
     }
 
-    static func error(_ code: ErrorCode, _ message: String) -> AppError {
+    nonisolated static func error(_ code: ErrorCode, _ message: String) -> AppError {
         AppError(code: code, message: message, isRecoverable: true)
+    }
+}
+
+/// Lets a continuation be resumed exactly once from a handler that can fire
+/// repeatedly (the handler runs on the main queue, so the lock is just insurance).
+nonisolated private final class ResumeOnce: @unchecked Sendable {
+    private let lock = NSLock()
+    private var done = false
+
+    func claim() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        if done { return false }
+        done = true
+        return true
     }
 }
 

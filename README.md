@@ -8,6 +8,8 @@ A small macOS menu bar app that shows the usage limits of several AI accounts in
 
 One icon sits in the menu bar and shows one account; the dropdown lists all of them. Click an account in the dropdown to show it in the menu bar, or switch on **Follow Claude Code** to have the icon follow whichever Claude account the [Claude Code Profile Switcher](https://marketplace.visualstudio.com/items?itemName=sairambkrishnan.claude-code-profile-switcher) VS Code extension has selected.
 
+Settings → **Stats** keeps a local, 90-day history of every account shown in the dropdown: session and weekly charts, weekly limit used per day, use by hour of day, average session and window peak, limit hits, and a projection of where the week will end.
+
 Forked from [hamed-elfayome/Claude-Usage-Tracker](https://github.com/hamed-elfayome/Claude-Usage-Tracker) and stripped down to just this.
 
 ## Build and install

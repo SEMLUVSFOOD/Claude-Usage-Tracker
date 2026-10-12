@@ -68,6 +68,7 @@ class ProfileManager: ObservableObject {
         guard profiles.count > 1 else { throw ProfileError.cannotDeleteLastProfile }
         profiles.removeAll { $0.id == id }
         profileStore.deleteProfileSecrets(id)
+        UsageHistoryStore.shared.deleteHistory(for: id)
         if activeProfile?.id == id, let first = profiles.first {
             activateProfile(first.id)
         }
@@ -132,6 +133,12 @@ class ProfileManager: ObservableObject {
     func canFetchUsage(for profile: Profile) -> Bool {
         profile.hasAnyCredentials
             || (profile.id == activeProfile?.id && ProviderRegistry.service(for: profile.provider).hasCredentials(for: profile))
+    }
+
+    /// The Codex profile that uses the Codex CLI's login (~/.codex/auth.json):
+    /// the first one without pasted credentials.
+    var codexCLIProfileId: UUID? {
+        profiles.first { $0.provider == .codex && $0.codexCredentialsJSON == nil }?.id
     }
 
     /// Profile Claude Code currently uses, when "Follow Claude Code" is on.
@@ -206,6 +213,7 @@ class ProfileManager: ObservableObject {
         profiles[index].claudeUsage = usage
         if activeProfile?.id == profileId { activeProfile = profiles[index] }
         profileStore.saveProfiles(profiles)
+        UsageHistoryStore.shared.record(usage, for: profileId)
     }
 }
 

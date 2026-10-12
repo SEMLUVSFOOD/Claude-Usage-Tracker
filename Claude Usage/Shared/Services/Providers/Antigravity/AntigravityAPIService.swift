@@ -189,9 +189,17 @@ final class AntigravityAPIService {
 
     private static func flattenStrings(_ value: Any) -> [String] {
         if let string = value as? String { return [string] }
-        if let object = value as? [String: Any] { return object.values.flatMap(flattenStrings) }
-        if let array = value as? [Any] { return array.flatMap(flattenStrings) }
-        return []
+        let children: [Any]
+        if let object = value as? [String: Any] {
+            children = Array(object.values)
+        } else if let array = value as? [Any] {
+            children = array
+        } else {
+            return []
+        }
+        var strings: [String] = []
+        for child in children { strings += flattenStrings(child) }
+        return strings
     }
 
     private static func number(_ value: Any?) -> Double? {

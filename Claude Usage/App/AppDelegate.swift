@@ -18,7 +18,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menuBarManager = manager
 
         // First run: nothing to show yet, so open Settings to add an account
-        if !ProfileManager.shared.profiles.contains(where: { $0.hasAnyCredentials }) {
+        let profileManager = ProfileManager.shared
+        if !profileManager.profiles.contains(where: { profileManager.canFetchUsage(for: $0) }) {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) {
                 manager.openSettings()
             }

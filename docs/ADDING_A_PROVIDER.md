@@ -1,82 +1,48 @@
 # Adding a Usage Provider
 
-Every provider lives behind one seam: `ProviderRegistry`. UI and services
-never check `provider == .something` — they read **capability flags** from the
-provider's `ProviderDescriptor`, and they fetch through the provider's
-`UsageProviderService`. Adding a provider is therefore an additive checklist;
-no core files (`MenuBarManager`, `ProfileManager`, `PopoverContentView`,
-`SetupWizardView`) should need editing.
-
-The reference implementation is Codex:
-`Shared/Services/Providers/Codex/`.
+Every provider lives behind one seam: `ProviderRegistry`. The menu bar,
+dropdown, Stats page and settings fetch through the provider's
+`UsageProviderService` and read facts from its `ProviderDescriptor`, so adding a
+provider is an additive checklist. Reference implementations:
+`Shared/Services/Providers/Codex/` (reads a CLI's auth file) and
+`Shared/Services/Providers/Antigravity/` (in-app OAuth sign-in).
 
 ## Data model contract
 
-Usage maps onto `ClaudeUsage` (percentages + reset dates are the common
-denominator every provider has):
+Usage maps onto `ClaudeUsage` (percentages + reset dates):
 
 - primary/short window → `sessionPercentage` / `sessionResetTime`
 - secondary/long window → `weeklyPercentage` / `weeklyResetTime`
-- no token counts? leave `*TokensUsed`/`*Limit` at **0** — the UI hides
-  token-based rows, the icon falls back to percentages, and history/CSV
-  suppress token columns via the `tokenCounts` capability
-- plan / credits (if reported) → `planType`, `creditsBalance`, `creditsUnlimited`
+- set `lastUpdated = Date()` on every live fetch — the Stats history uses it to
+  tell new readings from cached ones
+- no token counts? set `weeklyLimit = 0` and leave the token fields at 0
 
 ## Checklist
 
-1. **Enum case** — add to `Provider` (`Shared/Models/Provider.swift`).
-   The raw value is persisted in `profiles_v3`; never rename it. Older app
-   versions decode unknown values as `.anthropic` by design.
+1. **Enum case** — add to `Provider` (`Shared/Models/Provider.swift`). The raw
+   value is persisted; never rename it.
 
-2. **Folder** — `Shared/Services/Providers/<Name>/` containing:
-   - `<Name>AuthService.swift` — credential discovery (config file, keychain,
-     env), refresh, and persistence. If tokens rotate, write refreshed tokens
-     back to wherever the CLI/tool expects them (atomic temp-file + rename,
-     preserve unknown JSON keys — see `CodexAuthService.writeBackToAuthFile`).
-   - `<Name>APIService.swift` (+ `+Types.swift`) — fetch + **tolerant** DTOs
-     (per-field `try?` decoding; a new server field must never fail the whole
-     response) + mapping to `ClaudeUsage`.
-   - `<Name>UsageProvider.swift` — conforms to `UsageProviderService`
-     (`hasCredentials(for:)`, `fetchUsage(for:)`, optionally
-     `fetchUsageForActiveProfile(_:)` if the active profile has a broader auth
-     chain).
+2. **Folder** — `Shared/Services/Providers/<Name>/` with an auth service
+   (credential discovery/refresh/persistence), an API service (tolerant
+   decoding — a new server field must never fail the whole response) and a
+   `<Name>UsageProvider` conforming to `UsageProviderService`.
 
-3. **Registry entry** — `ProviderRegistry.descriptors` (displayName, logo,
-   status page URL if Statuspage-compatible, capability flags, credential
-   sections) and `ProviderRegistry.service(for:)`.
+3. **Registry entry** — `ProviderRegistry.descriptors` (display name, logo
+   fallback symbol, Statuspage-compatible status URL if any, capabilities,
+   sign-in pages) and `ProviderRegistry.service(for:)`.
 
-4. **Capabilities** — set every `ProviderCapabilities` flag deliberately.
-   `false` must cleanly hide/no-op the feature. Most new providers want
-   everything `false` except maybe `credits`.
-
-5. **Secrets** — if the provider stores a manual credential on the profile:
-   add a field to `Profile` (mirroring `codexCredentialsJSON`: excluded from
-   plist encoding, included under `includeSecretsKey`), a
+4. **Secrets** — a credential stored on the profile needs a `Profile` field
+   (encoded only under `includeSecretsKey`, like `codexCredentialsJSON`), a
    `KeychainService.ProfileSecretField` case, and the hydrate/persist lines in
-   `ProfileStore`.
+   `ProfileStore`. Extend `Profile.hasUsageCredentials` / `hasAnyCredentials`.
 
-6. **Credentials UI** — a `SettingsSection` case (`isCredential: true`, title
-   + icon + description) and a view modeled on `CodexAccountView` (detect →
-   manual paste → test connection). Route it in `SettingsView`'s content
-   switch and list it in the descriptor's `credentialSections`.
+5. **Sign-in page** — a `SettingsSection` case (title + icon, in
+   `SettingsView.swift`), a view modeled on `CodexAccountView` that edits
+   `ProfileManager.shared.editingProfile`, routed in `SettingsView`'s content
+   switch and listed in the descriptor's `credentialSections`.
 
-7. **Setup wizard** — a hint string for the provider card in
-   `ProviderChoiceSetupView` and a setup view modeled on `CodexSetupView`.
+6. **Brand mark** — add a case to `ProviderBrandMark` (`PopoverContentView.swift`)
+   if the provider deserves a drawn logo; otherwise its SF Symbol fallback is used.
 
-8. **Logo** — asset named per the descriptor's `logoAssetName` in
-   Assets.xcassets (template rendering); the SF Symbol fallback covers the
-   interim.
-
-9. **Localization** — add the new keys to all lproj dirs under `Resources/`
-   (see the "Multi-Provider / OpenAI Codex" block for the pattern).
-
-10. **Tests** — fixture-based decode tests (missing fields, malformed fields,
-    unknown enum values), auth parsing variants, and a 0-token mapping test.
-    See `CodexProviderTests`.
-
-## What you should NOT need to touch
-
-`MenuBarManager`, `ProfileManager`, `PopoverContentView`, `SetupWizardView`
-(beyond the hint string), `UsageHistoryService`, `NotificationManager`,
-`MenuBarIconRenderer`. If a change seems to require editing one of these,
-the right fix is usually a new capability flag, not a provider check.
+7. **Tests** — fixture-based decode tests (missing/malformed fields) and a
+   mapping test; see `CodexProviderTests`.

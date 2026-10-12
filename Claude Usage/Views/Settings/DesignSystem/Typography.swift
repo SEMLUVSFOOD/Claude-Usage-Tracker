@@ -17,7 +17,6 @@ enum Typography {
     static let subtitle: Font = .system(size: 14, weight: .semibold)
 
     /// Subsection headers and setting labels (13pt, medium)
-    static let sectionHeader: Font = .system(size: 13, weight: .medium)
 
     /// Regular body text and descriptions (13pt, regular)
     static let body: Font = .system(size: 13, weight: .regular)
@@ -29,10 +28,8 @@ enum Typography {
     static let caption: Font = .system(size: 11, weight: .regular)
 
     /// Monospaced text for code and keys (12pt, monospaced)
-    static let monospacedInput: Font = .system(size: 12, design: .monospaced)
 
     /// Monospaced values display (13pt, monospaced)
-    static let monospacedValue: Font = .system(size: 13, design: .monospaced)
 
     /// Small badges and tags (9pt, bold)
     static let badge: Font = .system(size: 9, weight: .bold)

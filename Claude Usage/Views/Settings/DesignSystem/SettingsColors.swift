@@ -25,7 +25,6 @@ enum SettingsColors {
     static let info = Color.blue
 
     /// Caution state (yellow)
-    static let caution = Color.yellow
 
     // MARK: - Semantic UI Colors
 
@@ -47,7 +46,6 @@ enum SettingsColors {
     // MARK: - Feature-Specific Colors
 
     /// Icon color for feature highlights
-    static let featureIcon = Color.blue
 
     /// Beta badge color
     static let betaBadge = Color.orange
@@ -58,21 +56,13 @@ enum SettingsColors {
     // MARK: - Threshold Colors (for usage indicators)
 
     /// Low usage (0-50%)
-    static let usageLow = Color.adaptiveGreen
 
     /// Medium usage (50-75%)
-    static let usageMedium = Color.yellow
 
     /// High usage (75-90%)
-    static let usageHigh = Color.orange
 
     /// Critical usage (90%+)
-    static let usageCritical = Color.red
 
     // MARK: - Opacity Variants
 
-    /// Border with opacity
-    static func borderColor(_ color: Color, opacity: Double = 0.3) -> Color {
-        return color.opacity(opacity)
-    }
 }

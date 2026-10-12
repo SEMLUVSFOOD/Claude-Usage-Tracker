@@ -18,8 +18,6 @@ final class LoggingService {
     // Category-specific loggers
     private lazy var apiLogger = OSLog(subsystem: subsystem, category: "API")
     private lazy var storageLogger = OSLog(subsystem: subsystem, category: "Storage")
-    private lazy var notificationLogger = OSLog(subsystem: subsystem, category: "Notifications")
-    private lazy var uiLogger = OSLog(subsystem: subsystem, category: "UI")
     private lazy var generalLogger = OSLog(subsystem: subsystem, category: "General")
 
     private init() {}

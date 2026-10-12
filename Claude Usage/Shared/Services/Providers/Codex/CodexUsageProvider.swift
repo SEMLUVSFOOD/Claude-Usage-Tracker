@@ -26,18 +26,17 @@ final class CodexUsageProvider: UsageProviderService {
     /// refresh and retry once — the Codex CLI has no equivalent of Anthropic's
     /// system-keychain fallback, so a failed retry surfaces the error.
     func fetchUsage(for profile: Profile) async throws -> ClaudeUsage {
-        // The shared ~/.codex/auth.json reflects ONE signed-in Codex account.
-        // Only the active profile may fall back to it — a non-active profile
-        // without its own pasted credentials would silently display (and
-        // record into its history) another account's stats. Mirrors the
-        // Anthropic provider's system-keychain rule.
+        // The shared ~/.codex/auth.json reflects ONE signed-in Codex account, so
+        // only one profile may use it: the first Codex profile without pasted
+        // credentials. Another one would silently display (and record into its
+        // history) the same account's stats.
         if profile.codexCredentialsJSON == nil {
-            let activeProfileId = await MainActor.run { ProfileManager.shared.activeProfile?.id }
-            guard profile.id == activeProfileId else {
+            let cliProfileId = await MainActor.run { ProfileManager.shared.codexCLIProfileId }
+            guard profile.id == cliProfileId else {
                 throw AppError(
                     code: .providerCredentialsNotFound,
                     message: "error.codex_credentials_not_found".localized,
-                    technicalDetails: "Non-active profile '\(profile.name)' has no pasted Codex credentials; auth.json is reserved for the active profile",
+                    technicalDetails: "Profile '\(profile.name)' has no pasted Codex credentials; auth.json belongs to another Codex profile",
                     isRecoverable: true,
                     recoverySuggestion: "error.codex_credentials_not_found.suggestion".localized
                 )

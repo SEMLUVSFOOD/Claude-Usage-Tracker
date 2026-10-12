@@ -8,25 +8,10 @@
 import Foundation
 
 extension Notification.Name {
-    /// Posted when the menu bar icon configuration changes (metrics enabled/disabled, order, styling, etc.)
-    static let menuBarIconConfigChanged = Notification.Name("menuBarIconConfigChanged")
-
-    /// Posted when credentials are added, removed, or changed (Claude.ai or API Console)
+    /// Posted when an account's credentials are added, removed, or changed
     static let credentialsChanged = Notification.Name("credentialsChanged")
 
-    /// Posted when the setup wizard should be shown manually (for testing)
-    static let showSetupWizard = Notification.Name("showSetupWizard")
-
-    /// Posted when the display mode changes (single/multi profile)
-    static let displayModeChanged = Notification.Name("displayModeChanged")
-
-    /// Posted when multi-profile visual config changes (icon style, show week, labels, etc.)
-    /// Unlike displayModeChanged, this does NOT recreate status items — only updates their icons.
+    /// Posted when what the menu bar shows changes: icon style, the profile it
+    /// shows, Follow Claude Code, or which accounts are listed
     static let multiProfileConfigChanged = Notification.Name("multiProfileConfigChanged")
-
-    /// Posted when auto-switch profile is triggered (for UI reactivity)
-    static let autoSwitchProfileTriggered = Notification.Name("autoSwitchProfileTriggered")
-
-    /// Posted when a Claude Code notch HUD setting is toggled (enabled/auto-hide)
-    static let notchHUDSettingChanged = Notification.Name("notchHUDSettingChanged")
 }
