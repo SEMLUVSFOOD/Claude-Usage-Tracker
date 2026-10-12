@@ -216,18 +216,8 @@ final class CodexAuthService {
         ]
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
-        let startTime = Date()
         let (data, response) = try await URLSession.shared.data(for: request)
         let statusCode = (response as? HTTPURLResponse)?.statusCode
-        NetworkLoggerService.shared.logRequest(
-            url: Constants.APIEndpoints.codexTokenRefresh,
-            method: "POST",
-            requestBody: nil,  // never log the refresh token
-            responseData: nil,
-            statusCode: statusCode,
-            duration: Date().timeIntervalSince(startTime),
-            error: nil
-        )
 
         guard statusCode == 200,
               let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {

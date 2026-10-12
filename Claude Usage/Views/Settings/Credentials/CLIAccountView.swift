@@ -28,7 +28,7 @@ struct CLIAccountView: View {
                     subtitle: "cli.subtitle".localized
                 )
 
-                if let profile = profileManager.activeProfile {
+                if let profile = profileManager.editingProfile {
                     // Professional Status Card
                     HStack(spacing: DesignTokens.Spacing.medium) {
                         Circle()
@@ -286,7 +286,7 @@ struct CLIAccountView: View {
             syncSelectedKeychainFromProfile()
             reloadKeychainList()
         }
-        .onChange(of: profileManager.activeProfile?.id) { _, _ in
+        .onChange(of: profileManager.editingProfile?.id) { _, _ in
             // Reload when profile changes
             loadCLIAccountInfo()
             syncError = nil
@@ -298,7 +298,7 @@ struct CLIAccountView: View {
     /// reflects the active profile's stored value when the view appears or the
     /// profile changes.
     private func syncSelectedKeychainFromProfile() {
-        selectedKeychainSvc = profileManager.activeProfile?.customKeychainServiceName
+        selectedKeychainSvc = profileManager.editingProfile?.customKeychainServiceName
     }
 
     /// Enumerates Claude Code keychain entries via SecItemCopyMatching and also
@@ -332,7 +332,7 @@ struct CLIAccountView: View {
     /// Persists the selected keychain service name onto the active profile so the
     /// menu bar fetch path picks it up on the next refresh cycle.
     private func updateCustomKeychain(_ svc: String?) {
-        guard var updated = profileManager.activeProfile else { return }
+        guard var updated = profileManager.editingProfile else { return }
         let normalized = (svc?.isEmpty ?? true) ? nil : svc
         if updated.customKeychainServiceName == normalized { return }
         updated.customKeychainServiceName = normalized
@@ -341,7 +341,7 @@ struct CLIAccountView: View {
     }
 
     private func syncFromCLI() {
-        guard let profileId = profileManager.activeProfile?.id else { return }
+        guard let profileId = profileManager.editingProfile?.id else { return }
 
         isSyncing = true
         syncError = nil
@@ -353,7 +353,7 @@ struct CLIAccountView: View {
             profileManager.loadProfiles()
 
             // Update profile metadata
-            if var updated = profileManager.activeProfile {
+            if var updated = profileManager.editingProfile {
                 updated.hasCliAccount = true
                 updated.cliAccountSyncedAt = Date()
                 profileManager.updateProfile(updated)
@@ -372,7 +372,7 @@ struct CLIAccountView: View {
     }
 
     private func removeSync() {
-        guard let profileId = profileManager.activeProfile?.id else { return }
+        guard let profileId = profileManager.editingProfile?.id else { return }
 
         do {
             try ClaudeCodeSyncService.shared.removeFromProfile(profileId)
@@ -381,7 +381,7 @@ struct CLIAccountView: View {
             profileManager.loadProfiles()
 
             // Update profile metadata
-            if var updated = profileManager.activeProfile {
+            if var updated = profileManager.editingProfile {
                 updated.hasCliAccount = false
                 updated.cliAccountSyncedAt = nil
                 profileManager.updateProfile(updated)
@@ -396,7 +396,7 @@ struct CLIAccountView: View {
     }
 
     private func loadCLIAccountInfo() {
-        guard let profile = profileManager.activeProfile else {
+        guard let profile = profileManager.editingProfile else {
             LoggingService.shared.logError("CLIAccountView: No active profile")
             cliAccountInfo = nil
             return

@@ -92,49 +92,7 @@ struct URLBuilder {
         return URLBuilder(components: newComponents)
     }
 
-    /// Append multiple path components
-    /// - Parameter paths: Array of path components
-    /// - Returns: A new URLBuilder with all paths appended
-    func appendingPathComponents(_ paths: [String]) throws -> URLBuilder {
-        var builder = self
-        for path in paths {
-            builder = try builder.appendingPath(path)
-        }
-        return builder
-    }
-
     // MARK: - Query Parameters
-
-    /// Add a query parameter
-    /// - Parameters:
-    ///   - name: Query parameter name
-    ///   - value: Query parameter value
-    /// - Returns: A new URLBuilder with the query parameter added
-    func addingQueryParameter(name: String, value: String) throws -> URLBuilder {
-        var newComponents = components
-
-        // Validate parameter name and value
-        guard !name.isEmpty else {
-            throw URLBuilderError.invalidQueryParameter(key: name, value: "Empty parameter name")
-        }
-
-        var queryItems = newComponents.queryItems ?? []
-        queryItems.append(URLQueryItem(name: name, value: value))
-        newComponents.queryItems = queryItems
-
-        return URLBuilder(components: newComponents)
-    }
-
-    /// Add multiple query parameters
-    /// - Parameter parameters: Dictionary of query parameters
-    /// - Returns: A new URLBuilder with all parameters added
-    func addingQueryParameters(_ parameters: [String: String]) throws -> URLBuilder {
-        var builder = self
-        for (key, value) in parameters {
-            builder = try builder.addingQueryParameter(name: key, value: value)
-        }
-        return builder
-    }
 
     // MARK: - Build
 
@@ -158,22 +116,6 @@ struct URLBuilder {
 // MARK: - Convenience Extensions
 
 extension URLBuilder {
-    /// Create a builder for Claude API endpoints
-    /// - Parameter endpoint: The API endpoint path
-    /// - Returns: A configured URLBuilder
-    static func claudeAPI(endpoint: String = "") throws -> URLBuilder {
-        let builder = try URLBuilder(baseURL: "https://claude.ai/api")
-        return endpoint.isEmpty ? builder : try builder.appendingPath(endpoint)
-    }
-
-    /// Create a builder for Console API endpoints
-    /// - Parameter endpoint: The API endpoint path
-    /// - Returns: A configured URLBuilder
-    static func consoleAPI(endpoint: String = "") throws -> URLBuilder {
-        let builder = try URLBuilder(baseURL: "https://console.anthropic.com/api")
-        return endpoint.isEmpty ? builder : try builder.appendingPath(endpoint)
-    }
-
     /// Create a builder for Claude Status endpoints
     /// - Parameter endpoint: The API endpoint path
     /// - Returns: A configured URLBuilder
@@ -186,13 +128,4 @@ extension URLBuilder {
 // MARK: - Result-based API
 
 extension URLBuilder {
-    /// Build the URL and return a Result type
-    /// - Returns: Result containing URL or Error
-    func buildResult() -> Result<URL, Error> {
-        do {
-            return .success(try build())
-        } catch {
-            return .failure(error)
-        }
-    }
 }

@@ -233,509 +233,140 @@ struct TrafficLightButton: View {
     }
 }
 
-/// Professional, native macOS Settings interface with multi-profile support
+/// Settings window: accounts (and each account's sign-in page), the menu bar
+/// icon, and general options.
 struct SettingsView: View {
-    @State private var selectedSection: SettingsSection = .appearance
+    @State private var page: SettingsPage = .accounts
     @StateObject private var profileManager = ProfileManager.shared
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         HStack(spacing: 0) {
-            // Sidebar with Profile Switcher
-            VStack(spacing: 0) {
-                // Traffic light buttons
+            VStack(alignment: .leading, spacing: 0) {
                 HStack {
                     TrafficLightButtons()
                     Spacer()
                 }
                 .padding(.leading, 12)
                 .padding(.top, 12)
+                .padding(.bottom, 10)
 
-                // Profile Section (Switcher + Credentials + Settings)
-                ProfileSectionContainer(selectedSection: $selectedSection)
-                    .padding(.horizontal, 12)
-                    .padding(.top, 8)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        SidebarItem(icon: "person.2.fill", title: "Accounts", description: "Add, rename or remove accounts",
+                                    isSelected: page == .accounts) { open(.accounts) }
 
-                // Sponsor slot (available placement)
-                SponsorSlotCard()
-                    .padding(.horizontal, 12)
-                    .padding(.top, 8)
+                        ForEach(profileManager.profiles) { profile in
+                            accountItems(for: profile)
+                        }
 
-                Spacer()
+                        Divider().padding(.vertical, 8).padding(.horizontal, 8)
 
-                // App Settings Section
-                AppSettingsSection(selectedSection: $selectedSection)
-                    .padding(.horizontal, 12)
-
-                // Bottom bar: About, Debug, Support, Updates
-                BottomBarSection(selectedSection: $selectedSection)
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 8)
-                    .padding(.top, 4)
+                        SidebarItem(icon: "menubar.rectangle", title: "Menu bar icon", description: "Icon style and Follow Claude Code",
+                                    isSelected: page == .menuBarIcon) { open(.menuBarIcon) }
+                        SidebarItem(icon: "gearshape.fill", title: "General", description: "Launch at login",
+                                    isSelected: page == .general) { open(.general) }
+                    }
+                    .padding(.horizontal, 8)
+                }
             }
             .background(SidebarVisualEffect())
             .frame(width: 190)
 
-            // Content
             Group {
-                switch selectedSection {
-                // Credentials
-                case .claudeAI:
-                    PersonalUsageView()
-                case .apiConsole:
-                    APIBillingView()
-                case .cliAccount:
-                    CLIAccountView()
-                case .codexAccount:
-                    CodexAccountView()
-                case .antigravityAccount:
-                    AntigravityAccountView()
-
-                // Profile Settings
-                case .appearance:
-                    AppearanceSettingsView()
+                switch page {
+                case .accounts:
+                    AccountsSettingsView(onOpenAccount: openFirstPage(of:))
+                case .account(_, let section):
+                    switch section {
+                    case .claudeAI: PersonalUsageView()
+                    case .cliAccount: CLIAccountView()
+                    case .codexAccount: CodexAccountView()
+                    case .antigravityAccount: AntigravityAccountView()
+                    }
+                case .menuBarIcon:
+                    MenuBarIconSettingsView()
                 case .general:
-                    GeneralSettingsView()
-                case .history:
-                    UsageHistoryView()
-
-                // Shared Settings
-                case .appSettings:
                     AppSettingsView()
-                case .manageProfiles:
-                    ManageProfilesView()
-                case .language:
-                    LanguageSettingsView()
-                case .claudeCode:
-                    ClaudeCodeView()
-                case .notchHUD:
-                    NotchHUDSettingsView()
-                case .shortcuts:
-                    ShortcutsSettingsView()
-                case .updates:
-                    UpdatesSettingsView()
-                case .support:
-                    SupportView()
-                case .mobileApp:
-                    MobileAppView()
-                case .popover:
-                    PopoverSettingsView()
-                case .debug:
-                    DebugNetworkLogView()
-                case .about:
-                    AboutView()
                 }
             }
+            // Credential pages read ProfileManager.editingProfile; rebuild per account
+            .id(page)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .background(
-                colorScheme == .dark
-                    ? Color.black.opacity(0.15)
-                    : Color.white.opacity(0.3)
-            )
+            .background(colorScheme == .dark ? Color.black.opacity(0.15) : Color.white.opacity(0.3))
         }
         .frame(minWidth: 720, maxWidth: 720, maxHeight: .infinity)
         .background(SettingsBackground())
     }
-}
 
-// MARK: - Profile Section Container
-
-struct ProfileSectionContainer: View {
-    @Binding var selectedSection: SettingsSection
-    @StateObject private var profileManager = ProfileManager.shared
-
-    var profileSections: [SettingsSection] {
-        SettingsSection.allCases.filter { $0.isProfileSetting && !$0.isCredential }
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Profile Switcher
-            VStack(alignment: .leading, spacing: 4) {
-                Text("section.active_profile".localized)
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundColor(.secondary)
-
-                Picker("", selection: Binding(
-                    get: { profileManager.activeProfile?.id ?? UUID() },
-                    set: { newId in
-                        Task {
-                            await profileManager.activateProfile(newId)
-                        }
-                    }
-                )) {
-                    ForEach(profileManager.profiles) { profile in
-                        HStack {
-                            Text(profile.name)
-                            if profile.hasCliAccount {
-                                Image(systemName: "checkmark.seal.fill")
-                                    .font(.system(size: 9))
-                                    .foregroundColor(.green)
-                            }
-                        }
-                        .tag(profile.id)
-                    }
-                }
-                .labelsHidden()
-                .pickerStyle(.menu)
-            }
-            .padding(8)
-
-            Divider()
-                .padding(.horizontal, 8)
-
-            // Credentials
-            VStack(alignment: .leading, spacing: 4) {
-                Text("section.credentials".localized)
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal, 8)
-                    .padding(.top, 6)
-
-                ProfileCredentialCardsRow(selectedSection: $selectedSection)
-                    .padding(.horizontal, 8)
-                    .padding(.bottom, 4)
-            }
-
-            Divider()
-                .padding(.horizontal, 8)
-
-            // Profile Settings
-            VStack(alignment: .leading, spacing: 4) {
-                Text("section.settings".localized)
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal, 8)
-                    .padding(.top, 6)
-
-                VStack(spacing: 4) {
-                    ForEach(profileSections, id: \.self) { section in
-                        Button {
-                            selectedSection = section
-                        } label: {
-                            SettingMiniButton(
-                                icon: section.icon,
-                                title: section.title,
-                                isSelected: selectedSection == section
-                            )
-                        }
-                        .buttonStyle(.plain)
-                        .help(section.description)
-                    }
-                }
-                .padding(.horizontal, 8)
-                .padding(.bottom, 4)
-            }
-        }
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(Color.primary.opacity(0.04))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 6)
-                .strokeBorder(Color.primary.opacity(0.08), lineWidth: 1)
-        )
-    }
-}
-
-// MARK: - Sponsor Slot
-
-/// A reserved placement in the settings sidebar, offered to sponsors.
-/// Clicking opens a pre-addressed mail for sponsorship inquiries.
-struct SponsorSlotCard: View {
-    private static let contactURL = URL(
-        string: "mailto:hamedelfayome@gmail.com?subject=Claude%20Usage%20Tracker%20%E2%80%94%20Sponsorship"
-    )
-
-    var body: some View {
-        Button {
-            if let url = Self.contactURL {
-                NSWorkspace.shared.open(url)
-            }
-        } label: {
-            VStack(spacing: 5) {
-                Image(systemName: "star.circle")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundColor(.secondary)
-                Text("sponsor.slot_title".localized)
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                Text("sponsor.slot_cta".localized)
-                    .font(.system(size: 9, weight: .medium))
-                    .foregroundColor(.accentColor)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 12)
-            .padding(.horizontal, 8)
-            .background(
-                RoundedRectangle(cornerRadius: 6)
-                    .fill(Color.primary.opacity(0.03))
-            )
-            .overlay(
-                RoundedRectangle(cornerRadius: 6)
-                    .strokeBorder(Color.primary.opacity(0.12), style: StrokeStyle(lineWidth: 1, dash: [4, 3]))
-            )
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .help("hamedelfayome@gmail.com")
-    }
-}
-
-// MARK: - App Settings Section
-
-struct AppSettingsSection: View {
-    @Binding var selectedSection: SettingsSection
-    @StateObject private var profileManager = ProfileManager.shared
-
-    var sharedSections: [SettingsSection] {
-        // The Claude Code (statusline) section is hidden only when NO profile
-        // is on a provider with CLI sync AND nothing is installed — while the
-        // statusline scripts are installed, the section must stay reachable
-        // so the user can uninstall them. NotchHUD is hook-driven, app-wide
-        // Claude Code infrastructure and stays visible regardless.
-        let hasCLISyncProfile = profileManager.profiles.contains {
-            $0.provider.descriptor.capabilities.cliAccountSync
-        }
-        let showClaudeCode = hasCLISyncProfile || StatuslineService.shared.isInstalled
-        return SettingsSection.allCases.filter {
-            guard !$0.isProfileSetting && !$0.isCredential && !$0.isBottomBarItem else { return false }
-            if $0 == .claudeCode && !showClaudeCode { return false }
-            return true
-        }
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("section.app".localized)
-                .font(.system(size: 9, weight: .medium))
-                .foregroundColor(.secondary)
-                .padding(.horizontal, 4)
-
-            ForEach(sharedSections, id: \.self) { section in
-                SidebarItem(
-                    icon: section.icon,
-                    title: section.title,
-                    description: section.description,
-                    isSelected: selectedSection == section
-                ) {
-                    selectedSection = section
-                }
-            }
-        }
-    }
-}
-
-struct BottomBarSection: View {
-    @Binding var selectedSection: SettingsSection
-    @State private var hoveredItem: String?
-
-    var items: [SettingsSection] {
-        SettingsSection.allCases.filter { $0.isBottomBarItem }
-    }
-
-    var body: some View {
-        VStack(spacing: 6) {
-            Divider()
-
-            HStack(spacing: 0) {
-                ForEach(items, id: \.self) { section in
-                    Button {
-                        selectedSection = section
-                    } label: {
-                        bottomBarLabel(
-                            icon: section.icon,
-                            label: section.shortLabel,
-                            isSelected: selectedSection == section,
-                            isHovered: hoveredItem == section.rawValue
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .onHover { hovering in
-                        hoveredItem = hovering ? section.rawValue : nil
-                    }
-                    .help(section.title)
-                }
-
-                // Quit button
-                Button {
-                    NSApplication.shared.terminate(nil)
-                } label: {
-                    bottomBarLabel(
-                        icon: "power",
-                        label: "common.quit".localized,
-                        isSelected: false,
-                        isHovered: hoveredItem == "quit",
-                        hoverColor: Color.red.opacity(0.1)
-                    )
-                }
-                .buttonStyle(.plain)
-                .onHover { hovering in
-                    hoveredItem = hovering ? "quit" : nil
-                }
-                .help("common.quit".localized)
-            }
-        }
-    }
-
-    private func bottomBarLabel(icon: String, label: String, isSelected: Bool, isHovered: Bool, hoverColor: Color? = nil) -> some View {
-        VStack(spacing: 2) {
-            Image(systemName: icon)
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(isSelected ? .white : .secondary)
-                .frame(height: 14)
-
-            Text(label)
-                .font(.system(size: 8, weight: .medium))
-                .foregroundColor(isSelected ? .white.opacity(0.9) : .secondary.opacity(0.7))
+    @ViewBuilder
+    private func accountItems(for profile: Profile) -> some View {
+        let sections = profile.provider.descriptor.credentialSections
+        HStack(spacing: 6) {
+            ProviderBrandMark(provider: profile.provider, size: 14)
+            Text(profile.name)
+                .font(.system(size: 11, weight: .medium))
                 .lineLimit(1)
+            Spacer()
         }
-        .frame(maxWidth: .infinity)
-        .frame(height: 36)
-        .background(
-            RoundedRectangle(cornerRadius: 4)
-                .fill(isSelected ? SettingsColors.primary : (isHovered ? (hoverColor ?? Color.primary.opacity(0.06)) : Color.clear))
-        )
+        .padding(.horizontal, 12)
+        .padding(.top, 8)
+        .padding(.bottom, 2)
         .contentShape(Rectangle())
+        .onTapGesture { openFirstPage(of: profile.id) }
+
+        ForEach(sections, id: \.self) { section in
+            SidebarItem(icon: section.icon, title: section.title, description: section.title,
+                        isSelected: page == .account(profile.id, section)) {
+                open(.account(profile.id, section))
+            }
+            .padding(.leading, 10)
+        }
+    }
+
+    private func openFirstPage(of profileId: UUID) {
+        guard let profile = profileManager.profiles.first(where: { $0.id == profileId }),
+              let section = profile.provider.descriptor.credentialSections.first else { return }
+        open(.account(profileId, section))
+    }
+
+    private func open(_ newPage: SettingsPage) {
+        if case .account(let id, _) = newPage {
+            profileManager.editingProfileId = id
+        }
+        page = newPage
     }
 }
 
+enum SettingsPage: Hashable {
+    case accounts
+    case account(UUID, SettingsSection)
+    case menuBarIcon
+    case general
+}
+
+/// Sign-in pages a provider offers (listed in its ProviderDescriptor)
 enum SettingsSection: String, CaseIterable {
-    // Credentials (not shown in sidebar)
     case claudeAI
-    case apiConsole
     case cliAccount
     case codexAccount
     case antigravityAccount
 
-    // Profile Settings
-    case appearance
-    case general
-    case history
-
-    // Shared Settings
-    case appSettings
-    case manageProfiles
-    case language
-    case claudeCode
-    case notchHUD
-    case shortcuts
-    case updates
-    case support
-    case mobileApp
-    case popover
-    case debug
-    case about
-
     var title: String {
         switch self {
-        case .claudeAI: return "section.claudeai_title".localized
-        case .apiConsole: return "section.api_console_title".localized
-        case .cliAccount: return "section.cli_account_title".localized
-        case .codexAccount: return "section.codex_account_title".localized
-        case .antigravityAccount: return "Google Account"
-        case .appearance: return "section.appearance_title".localized
-        case .general: return "section.general_title".localized
-        case .history: return "section.history_title".localized
-        case .appSettings: return "section.app_settings_title".localized
-        case .manageProfiles: return "section.manage_profiles_title".localized
-        case .language: return "language.title".localized
-        case .claudeCode: return "settings.claude_cli".localized
-        case .notchHUD: return "notch.hud.section_title".localized
-        case .shortcuts: return "section.shortcuts_title".localized
-        case .updates: return "settings.updates".localized
-        case .support: return "section.support_title".localized
-        case .mobileApp: return "section.mobile_app_title".localized
-        case .popover: return "section.popover_title".localized
-        case .debug: return "section.debug_title".localized
-        case .about: return "settings.about".localized
+        case .claudeAI: return "Claude.ai session"
+        case .cliAccount: return "Claude Code login"
+        case .codexAccount: return "Codex CLI"
+        case .antigravityAccount: return "Google account"
         }
     }
 
     var icon: String {
         switch self {
         case .claudeAI: return "key.fill"
-        case .apiConsole: return "dollarsign.circle.fill"
         case .cliAccount: return "terminal.fill"
         case .codexAccount: return "terminal.fill"
         case .antigravityAccount: return "person.badge.key.fill"
-        case .appearance: return "paintbrush.fill"
-        case .general: return "gearshape.fill"
-        case .history: return "chart.bar.xaxis"
-        case .appSettings: return "gearshape.2.fill"
-        case .manageProfiles: return "person.2.fill"
-        case .language: return "globe"
-        case .claudeCode: return "chevron.left.forwardslash.chevron.right"
-        case .notchHUD: return "inset.filled.topthird.rectangle"
-        case .shortcuts: return "keyboard"
-        case .updates: return "arrow.down.circle.fill"
-        case .support: return "heart.fill"
-        case .mobileApp: return "iphone"
-        case .popover: return "rectangle.topthird.inset.filled"
-        case .debug: return "ladybug.fill"
-        case .about: return "info.circle.fill"
-        }
-    }
-
-    var description: String {
-        switch self {
-        case .claudeAI: return "section.claudeai_desc".localized
-        case .apiConsole: return "section.api_console_desc".localized
-        case .cliAccount: return "section.cli_account_desc".localized
-        case .codexAccount: return "section.codex_account_desc".localized
-        case .antigravityAccount: return "Sign in with Google for Antigravity usage"
-        case .appearance: return "section.appearance_desc".localized
-        case .general: return "section.general_desc".localized
-        case .history: return "section.history_desc".localized
-        case .appSettings: return "section.app_settings_desc".localized
-        case .manageProfiles: return "section.manage_profiles_desc".localized
-        case .language: return "language.subtitle".localized
-        case .claudeCode: return "settings.claude_cli.description".localized
-        case .notchHUD: return "notch.hud.section_desc".localized
-        case .shortcuts: return "section.shortcuts_desc".localized
-        case .updates: return "settings.updates.description".localized
-        case .support: return "section.support_desc".localized
-        case .mobileApp: return "section.mobile_app_desc".localized
-        case .popover: return "section.popover_desc".localized
-        case .debug: return "section.debug_desc".localized
-        case .about: return "settings.about.description".localized
-        }
-    }
-
-    var shortLabel: String {
-        switch self {
-        case .about: return "About"
-        case .debug: return "Debug"
-        case .support: return "Support"
-        default: return title
-        }
-    }
-
-    var isCredential: Bool {
-        switch self {
-        case .claudeAI, .apiConsole, .cliAccount, .codexAccount, .antigravityAccount:
-            return true
-        default:
-            return false
-        }
-    }
-
-    var isProfileSetting: Bool {
-        switch self {
-        case .appearance, .general, .history:
-            return true
-        default:
-            return false
-        }
-    }
-
-    var isBottomBarItem: Bool {
-        switch self {
-        case .about, .debug, .support:
-            return true
-        default:
-            return false
         }
     }
 }
@@ -779,151 +410,5 @@ struct SidebarItem: View {
             isHovered = hovering
         }
         .help(description)
-    }
-}
-
-// MARK: - Profile Credential Cards Row
-
-struct ProfileCredentialCardsRow: View {
-    @Binding var selectedSection: SettingsSection
-    @StateObject private var profileManager = ProfileManager.shared
-    @State private var credentials: ProfileCredentials?
-
-    /// Credential sections come from the active profile's provider descriptor,
-    /// so each provider shows only its own credential cards.
-    private var credentialSections: [SettingsSection] {
-        (profileManager.activeProfile?.provider ?? .anthropic).descriptor.credentialSections
-    }
-
-    var body: some View {
-        VStack(spacing: 4) {
-            ForEach(credentialSections, id: \.self) { section in
-                Button {
-                    selectedSection = section
-                } label: {
-                    CredentialMiniCard(
-                        icon: section.icon,
-                        title: cardTitle(for: section),
-                        isConnected: isConnected(section),
-                        isSelected: selectedSection == section
-                    )
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .onAppear {
-            loadCredentials()
-        }
-        .onChange(of: profileManager.activeProfile?.id) { _, _ in
-            loadCredentials()
-            // A credential section from another provider may still be selected
-            // after a profile switch — snap back to a section that exists.
-            if selectedSection.isCredential, !credentialSections.contains(selectedSection) {
-                selectedSection = credentialSections.first ?? .general
-            }
-        }
-    }
-
-    private func cardTitle(for section: SettingsSection) -> String {
-        switch section {
-        case .claudeAI: return "Claude.ai"
-        case .apiConsole: return "API Console"
-        case .cliAccount: return "CLI Account"
-        case .codexAccount: return "Codex CLI"
-        case .antigravityAccount: return "Google"
-        default: return section.title
-        }
-    }
-
-    private func isConnected(_ section: SettingsSection) -> Bool {
-        switch section {
-        case .claudeAI: return credentials?.hasClaudeAI ?? false
-        case .apiConsole: return credentials?.apiSessionKey != nil
-        case .cliAccount: return profileManager.activeProfile?.hasCliAccount ?? false
-        case .codexAccount: return profileManager.activeProfile?.hasUsageCredentials ?? false
-        case .antigravityAccount: return profileManager.activeProfile?.hasUsageCredentials ?? false
-        default: return false
-        }
-    }
-
-    private func loadCredentials() {
-        guard let profile = profileManager.activeProfile else { return }
-        credentials = try? ProfileStore.shared.loadProfileCredentials(profile.id)
-    }
-}
-
-struct CredentialMiniCard: View {
-    let icon: String
-    let title: String
-    let isConnected: Bool
-    let isSelected: Bool
-    @State private var isHovered = false
-
-    var body: some View {
-        HStack(spacing: 8) {
-            // Icon
-            Image(systemName: icon)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(isSelected ? .white : (isConnected ? .green : .gray))
-                .frame(width: 12)
-
-            // Title
-            Text(title)
-                .font(.system(size: 11, weight: isSelected ? .medium : .regular))
-                .foregroundColor(isSelected ? .white : .primary)
-
-            Spacer()
-
-            // Status indicator
-            Circle()
-                .fill(isSelected ? Color.white.opacity(0.9) : (isConnected ? Color.green : Color.gray.opacity(0.3)))
-                .frame(width: 5, height: 5)
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(
-            RoundedRectangle(cornerRadius: 4)
-                .fill(isSelected ? SettingsColors.primary : (isHovered ? Color.primary.opacity(0.06) : Color.clear))
-        )
-        .padding(.horizontal, 4)
-        .padding(.vertical, 1)
-        .onHover { hovering in
-            isHovered = hovering
-        }
-    }
-}
-
-struct SettingMiniButton: View {
-    let icon: String
-    let title: String
-    let isSelected: Bool
-    @State private var isHovered = false
-
-    var body: some View {
-        HStack(spacing: 8) {
-            // Icon
-            Image(systemName: icon)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(isSelected ? .white : .secondary)
-                .frame(width: 12)
-
-            // Title
-            Text(title)
-                .font(.system(size: 11, weight: isSelected ? .medium : .regular))
-                .foregroundColor(isSelected ? .white : .primary)
-
-            Spacer()
-        }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(
-            RoundedRectangle(cornerRadius: 4)
-                .fill(isSelected ? SettingsColors.primary : (isHovered ? Color.primary.opacity(0.06) : Color.clear))
-        )
-        .padding(.horizontal, 4)
-        .padding(.vertical, 1)
-        .onHover { hovering in
-            isHovered = hovering
-        }
     }
 }

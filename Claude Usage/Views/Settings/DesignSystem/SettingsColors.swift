@@ -71,11 +71,6 @@ enum SettingsColors {
 
     // MARK: - Opacity Variants
 
-    /// Light background overlay (for cards on cards)
-    static func lightOverlay(_ color: Color, opacity: Double = 0.1) -> Color {
-        return color.opacity(opacity)
-    }
-
     /// Border with opacity
     static func borderColor(_ color: Color, opacity: Double = 0.3) -> Color {
         return color.opacity(opacity)

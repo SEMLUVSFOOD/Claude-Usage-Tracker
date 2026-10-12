@@ -264,20 +264,6 @@ final class SessionKeyValidatorTests: XCTestCase {
 
     // MARK: - String Extension Tests
 
-    func testStringExtensionValid() {
-        let validKey = "sk-ant-sid01-abcdefghijklmnopqrstuvwxyz"
-
-        XCTAssertTrue(validKey.isValidSessionKey)
-        XCTAssertNoThrow(try validKey.validateAsSessionKey())
-    }
-
-    func testStringExtensionInvalid() {
-        let invalidKey = "invalid-key"
-
-        XCTAssertFalse(invalidKey.isValidSessionKey)
-        XCTAssertThrowsError(try invalidKey.validateAsSessionKey())
-    }
-
     // MARK: - Edge Cases
 
     func testMixedCasePrefix() {

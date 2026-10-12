@@ -33,7 +33,7 @@ enum ProviderRegistry {
                 overageChecks: true,
                 credits: false
             ),
-            credentialSections: [.claudeAI, .apiConsole, .cliAccount],
+            credentialSections: [.claudeAI, .cliAccount],
             primaryWindowLabelKey: "usage.window.session",
             secondaryWindowLabelKey: "usage.window.weekly"
         ),

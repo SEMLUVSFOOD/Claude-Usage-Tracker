@@ -63,12 +63,6 @@ class ClaudeCodeSyncService {
         return usable
     }
 
-    /// Drops the cached availability answer (call after syncs/logins that
-    /// change the keychain state).
-    func invalidateSystemCredentialsCache() {
-        systemCredsUsableCache = nil
-    }
-
     // MARK: - System Credentials Access (Fallback Chain)
 
     /// Reads Claude Code credentials using a fallback chain:
@@ -575,16 +569,6 @@ class ClaudeCodeSyncService {
         return nil
     }
 
-    /// Invalidates the cached service name, forcing re-discovery on next access.
-    /// This also clears the persisted resolution and the discovery-attempted flag
-    /// so a subsequent call will re-run the full resolution chain.
-    func invalidateServiceNameCache() {
-        resolvedServiceName = nil
-        let defaults = UserDefaults.standard
-        defaults.removeObject(forKey: Self.persistedServiceNameKey)
-        defaults.removeObject(forKey: Self.discoveryAttemptedKey)
-    }
-
     /// Writes credentials to `~/.claude/.credentials.json` so that
     /// `readSystemCredentials()` (which reads the file as Priority 1) returns
     /// the correct data after a profile switch. Without this, the stale file
@@ -714,44 +698,6 @@ class ClaudeCodeSyncService {
         return nil
     }
 
-    /// Writes an `oauthAccount` object (serialized JSON string) back into
-    /// Claude Code's `.claude.json` config file, replacing whatever was there.
-    /// Preserves all other top-level keys in the file. Does nothing if no
-    /// `.claude.json` file exists (we don't want to create a file from scratch
-    /// and accidentally overwrite user settings).
-    func writeOAuthAccount(_ oauthAccountJSON: String) throws {
-        guard let url = locateClaudeConfigFile() else {
-            LoggingService.shared.log("writeOAuthAccount: no .claude.json config file found — skipping write")
-            return
-        }
-
-        // Parse the stored oauthAccount string
-        guard let newAccountData = oauthAccountJSON.data(using: .utf8),
-              let newAccount = try? JSONSerialization.jsonObject(with: newAccountData) as? [String: Any] else {
-            LoggingService.shared.log("writeOAuthAccount: stored oauthAccount JSON is invalid, skipping")
-            throw ClaudeCodeError.invalidJSON
-        }
-
-        // Read + merge existing file (preserve all other top-level keys)
-        let existingData = try Data(contentsOf: url)
-        guard var root = try JSONSerialization.jsonObject(with: existingData) as? [String: Any] else {
-            LoggingService.shared.log("writeOAuthAccount: .claude.json root is not a JSON object")
-            throw ClaudeCodeError.invalidJSON
-        }
-
-        root["oauthAccount"] = newAccount
-
-        // Pretty-print to match Claude Code's on-disk format (best-effort)
-        let updatedData = try JSONSerialization.data(
-            withJSONObject: root,
-            options: [.prettyPrinted, .sortedKeys]
-        )
-
-        // Atomic write so a crash mid-write can't corrupt the file
-        try updatedData.write(to: url, options: [.atomic])
-        LoggingService.shared.log("✓ Updated oauthAccount in \(url.lastPathComponent)")
-    }
-
     // MARK: - Profile Sync Operations
 
     /// Syncs credentials from system to profile (one-time copy)
@@ -783,39 +729,6 @@ class ClaudeCodeSyncService {
         ProfileStore.shared.saveProfiles(profiles)
 
         LoggingService.shared.log("Synced CLI credentials to profile: \(profileId)\(capturedOAuthAccount != nil ? " (with oauthAccount)" : "")")
-    }
-
-    /// Applies profile's CLI credentials to system (overwrites current login).
-    /// Also restores the profile's captured `oauthAccount` to `~/.claude.json`
-    /// so that Claude Code's `/status` command reflects the correct account
-    /// after switching (see issue #175).
-    func applyProfileCredentials(_ profileId: UUID) throws {
-        LoggingService.shared.log("🔄 Applying CLI credentials for profile: \(profileId)")
-
-        let profiles = ProfileStore.shared.loadProfiles()
-        guard let profile = profiles.first(where: { $0.id == profileId }),
-              let jsonData = profile.cliCredentialsJSON else {
-            LoggingService.shared.log("❌ No CLI credentials found for profile: \(profileId)")
-            throw ClaudeCodeError.noProfileCredentials
-        }
-
-        LoggingService.shared.log("📦 Found CLI credentials, writing to keychain and credentials file...")
-        try writeSystemCredentials(jsonData)
-        writeCredentialsFile(jsonData)
-
-        // Restore the profile's captured oauthAccount (if any) so Claude Code's
-        // /status Status tab shows the right email/org/plan for this profile.
-        if let storedOAuthAccount = profile.oauthAccountJSON {
-            do {
-                try writeOAuthAccount(storedOAuthAccount)
-            } catch {
-                LoggingService.shared.logError("Failed to restore oauthAccount (non-fatal)", error: error)
-            }
-        } else {
-            LoggingService.shared.log("Profile has no stored oauthAccount — skipping .claude.json update")
-        }
-
-        LoggingService.shared.log("✅ Applied profile CLI credentials to system: \(profileId)")
     }
 
     /// Removes CLI credentials from profile (doesn't affect system)
@@ -1204,80 +1117,6 @@ class ClaudeCodeSyncService {
 
     // MARK: - Auto Re-sync Before Switching
 
-    /// Re-syncs credentials from system Keychain before profile switching
-    /// This ensures we always have the latest CLI login when switching profiles
-    func resyncBeforeSwitching(for profileId: UUID) throws {
-        LoggingService.shared.log("Re-syncing CLI credentials before profile switch: \(profileId)")
-
-        // Read fresh credentials from system (if user is logged in)
-        guard let freshJSON = try readSystemCredentials() else {
-            // No credentials in system - user not logged into CLI anymore
-            LoggingService.shared.log("No system credentials found - skipping re-sync")
-            return
-        }
-
-        // Validate JSON before saving (defense-in-depth against truncated data)
-        guard let data = freshJSON.data(using: .utf8),
-              let _ = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            LoggingService.shared.log("Re-synced credentials contain invalid JSON - skipping save")
-            return
-        }
-
-        // Verify the system credentials belong to the same account as this profile.
-        // IMPORTANT: compare ACCOUNT IDENTITY (oauthAccount.accountUuid), not refresh
-        // tokens. Claude Code ROTATES refresh tokens during normal use, so for the same
-        // account the system refresh token routinely differs from our stored snapshot —
-        // that rotation is exactly what we must capture here, or the profile keeps a
-        // consumed refresh token and every later refresh fails with invalid_grant.
-        var profiles = ProfileStore.shared.loadProfiles()
-        if let profile = profiles.first(where: { $0.id == profileId }) {
-            let systemIdentity = accountIdentity(fromOAuthAccountJSON: readOAuthAccount())
-            let profileIdentity = accountIdentity(fromOAuthAccountJSON: profile.oauthAccountJSON)
-            if let sys = systemIdentity, let stored = profileIdentity {
-                if sys != stored {
-                    LoggingService.shared.log("⚠️ resyncBeforeSwitching: skipping for '\(profile.name)' — system account (\(sys)) differs from profile account (\(stored))")
-                    return
-                }
-                // Same account — capture even though the refresh token rotated.
-            } else if let storedJSON = profile.cliCredentialsJSON {
-                // Identity unavailable on one side — fall back to the conservative
-                // refresh-token equality check to avoid cross-profile contamination.
-                let freshRefreshToken = extractRefreshToken(from: freshJSON)
-                let storedRefreshToken = extractRefreshToken(from: storedJSON)
-                if let fresh = freshRefreshToken, let stored = storedRefreshToken, fresh != stored {
-                    LoggingService.shared.log("⚠️ resyncBeforeSwitching: skipping for '\(profile.name)' — no account identity available and refresh token differs")
-                    return
-                }
-                // A manually pasted setup token has neither an oauthAccount id
-                // nor a refreshToken, so no identity check can vouch that the
-                // system keychain belongs to the same account — never overwrite
-                // the manual token with potentially foreign credentials.
-                if storedRefreshToken == nil && profileIdentity == nil {
-                    LoggingService.shared.log("⚠️ resyncBeforeSwitching: skipping for '\(profile.name)' — profile uses a manual setup token; account identity unverifiable")
-                    return
-                }
-            }
-        }
-
-        // Capture latest oauthAccount too, so if the user logged in with a
-        // different account since the last sync we keep the profile's
-        // `.claude.json` identity in sync with its keychain credentials.
-        let freshOAuthAccount = readOAuthAccount()
-
-        // Update profile's stored credentials with fresh ones (profiles already loaded above)
-        guard let index = profiles.firstIndex(where: { $0.id == profileId }) else {
-            return
-        }
-
-        profiles[index].cliCredentialsJSON = freshJSON
-        if let freshOAuthAccount = freshOAuthAccount {
-            profiles[index].oauthAccountJSON = freshOAuthAccount
-        }
-        profiles[index].cliAccountSyncedAt = Date()  // Update sync timestamp
-        ProfileStore.shared.saveProfiles(profiles)
-
-        LoggingService.shared.log("✓ Re-synced CLI credentials from system and updated timestamp\(freshOAuthAccount != nil ? " (with oauthAccount)" : "")")
-    }
 }
 
 // MARK: - ClaudeCodeError

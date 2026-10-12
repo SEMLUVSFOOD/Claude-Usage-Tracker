@@ -90,19 +90,9 @@ final class CodexAPIService {
             request.setValue(accountId, forHTTPHeaderField: "ChatGPT-Account-Id")
         }
 
-        let startTime = Date()
         let (data, response) = try await URLSession.shared.data(for: request)
         let statusCode = (response as? HTTPURLResponse)?.statusCode
 
-        NetworkLoggerService.shared.logRequest(
-            url: url.absoluteString,
-            method: "GET",
-            requestBody: nil,
-            responseData: data,
-            statusCode: statusCode,
-            duration: Date().timeIntervalSince(startTime),
-            error: nil
-        )
 
         switch statusCode {
         case .some(200...299):

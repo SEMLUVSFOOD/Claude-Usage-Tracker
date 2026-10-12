@@ -33,7 +33,7 @@ struct CodexAccountView: View {
                     subtitle: "codex.subtitle".localized
                 )
 
-                if let profile = profileManager.activeProfile {
+                if let profile = profileManager.editingProfile {
                     statusCard(for: profile)
                     detectionCard(for: profile)
                     manualEntryCard(for: profile)

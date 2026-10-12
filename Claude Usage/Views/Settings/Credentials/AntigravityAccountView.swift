@@ -158,9 +158,9 @@ struct AntigravityAccountView: View {
     @StateObject private var profileManager = ProfileManager.shared
     @ObservedObject private var controller = AntigravitySignInController.shared
 
-    /// The active profile when it's a Google one, else the first Google profile.
+    /// The profile open in Settings when it's a Google one, else the first Google profile.
     private var profile: Profile? {
-        if let active = profileManager.activeProfile, active.provider == .antigravity { return active }
+        if let editing = profileManager.editingProfile, editing.provider == .antigravity { return editing }
         return profileManager.profiles.first { $0.provider == .antigravity }
     }
 

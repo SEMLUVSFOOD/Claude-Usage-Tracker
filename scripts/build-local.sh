@@ -2,7 +2,7 @@
 # Builds "Claude Usage.app" with only the Xcode Command Line Tools (no Xcode).
 #
 # SwiftPM compiles the app sources, then the bundle is assembled by hand:
-# Info.plist, localizations, app icon, logo images and Sparkle.framework.
+# Info.plist, localizations, app icon and logo image.
 # Output: build/local/Claude Usage.app and build/local/Claude-Usage.dmg
 #
 # Usage: scripts/build-local.sh [--install]
@@ -19,7 +19,6 @@ SRC="$REPO/Claude Usage"
 WORK="$REPO/build/local"
 PKG="$WORK/pkg"
 APP="$WORK/Claude Usage.app"
-NOTCHKIT="$WORK/DynamicNotchKit"
 PBX="$REPO/Claude Usage.xcodeproj/project.pbxproj"
 
 MARKETING_VERSION=$(grep -m1 'MARKETING_VERSION = ' "$PBX" | sed 's/.*= \(.*\);/\1/')
@@ -54,53 +53,6 @@ if [ ! -x "$TOOLCHAIN/usr/bin/swift" ]; then
 fi
 SWIFT="$TOOLCHAIN/usr/bin/swift"
 
-# --- DynamicNotchKit: vendored copy without SwiftUI macros (@Entry, #Preview),
-#     whose compiler plugins ship only with full Xcode.
-if [ ! -d "$NOTCHKIT" ]; then
-    git clone --quiet --depth 1 --branch 1.1.0 https://github.com/MrKai77/DynamicNotchKit "$NOTCHKIT"
-    cat > "$NOTCHKIT/Package.swift" <<'EOF'
-// swift-tools-version: 5.10
-import PackageDescription
-
-let package = Package(
-    name: "DynamicNotchKit",
-    platforms: [.macOS(.v13)],
-    products: [.library(name: "DynamicNotchKit", targets: ["DynamicNotchKit"])],
-    targets: [.target(name: "DynamicNotchKit", path: "Sources")]
-)
-EOF
-    cat > "$NOTCHKIT/Sources/DynamicNotchKit/Utility/EnvironmentValues+Extensions.swift" <<'EOF'
-import SwiftUI
-
-private struct NotchStyleKey: EnvironmentKey {
-    static let defaultValue: DynamicNotchStyle = .auto
-}
-
-private struct NotchSectionKey: EnvironmentKey {
-    static let defaultValue: DynamicNotchSection = .expanded
-}
-
-extension EnvironmentValues {
-    var notchStyle: DynamicNotchStyle {
-        get { self[NotchStyleKey.self] }
-        set { self[NotchStyleKey.self] = newValue }
-    }
-
-    var notchSection: DynamicNotchSection {
-        get { self[NotchSectionKey.self] }
-        set { self[NotchSectionKey.self] = newValue }
-    }
-}
-
-enum DynamicNotchSection {
-    case expanded
-    case compactLeading
-    case compactTrailing
-}
-EOF
-    find "$NOTCHKIT/Sources" -name '*.swift' -print0 | xargs -0 python3 "$REPO/scripts/strip_previews.py"
-fi
-
 # --- App sources: fresh copy with #Preview blocks removed
 rm -rf "$PKG/Sources"
 mkdir -p "$PKG/Sources/ClaudeUsage"
@@ -114,17 +66,9 @@ import PackageDescription
 let package = Package(
     name: "ClaudeUsage",
     platforms: [.macOS(.v14)],
-    dependencies: [
-        .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.8.1"),
-        .package(path: "../DynamicNotchKit"),
-    ],
     targets: [
         .executableTarget(
             name: "ClaudeUsage",
-            dependencies: [
-                .product(name: "Sparkle", package: "Sparkle"),
-                .product(name: "DynamicNotchKit", package: "DynamicNotchKit"),
-            ],
             path: "Sources/ClaudeUsage",
             // Mirror the Xcode target: Swift 5 mode, default MainActor
             // isolation, approachable concurrency.
@@ -149,11 +93,9 @@ BIN_DIR="$(cd "$PKG" && "$SWIFT" build -c release --show-bin-path)"
 # --- Assemble the bundle
 echo "==> Assembling app bundle"
 rm -rf "$APP"
-mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN_DIR/ClaudeUsage" "$APP/Contents/MacOS/Claude Usage"
-install_name_tool -add_rpath "@executable_path/../Frameworks" "$APP/Contents/MacOS/Claude Usage"
 install_name_tool -delete_rpath "$TOOLCHAIN/usr/lib/swift-6.2/macosx" "$APP/Contents/MacOS/Claude Usage" 2>/dev/null || true
-cp -R "$BIN_DIR/Sparkle.framework" "$APP/Contents/Frameworks/"
 
 sed -e 's/$(DEVELOPMENT_LANGUAGE)/en/' \
     -e 's/$(EXECUTABLE_NAME)/Claude Usage/' \
@@ -177,20 +119,11 @@ ICONSET="$WORK/AppIcon.iconset"
 rm -rf "$ICONSET" && mkdir -p "$ICONSET"
 cp "$SRC"/Assets.xcassets/AppIcon.appiconset/icon_*.png "$ICONSET/"
 iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns"
-for logo in header about wizard; do
-    name="$(tr '[:lower:]' '[:upper:]' <<< "${logo:0:1}")${logo:1}Logo"
-    set_dir="$SRC/Assets.xcassets/$name.imageset"
-    cp "$set_dir/${logo}_logo_1x.png" "$APP/Contents/Resources/$name.png"
-    cp "$set_dir/${logo}_logo.png" "$APP/Contents/Resources/$name@2x.png"
-done
+cp "$SRC/Assets.xcassets/HeaderLogo.imageset/header_logo_1x.png" "$APP/Contents/Resources/HeaderLogo.png"
+cp "$SRC/Assets.xcassets/HeaderLogo.imageset/header_logo.png" "$APP/Contents/Resources/HeaderLogo@2x.png"
 
-# --- Sign (inside-out)
+# --- Sign
 echo "==> Signing"
-SPARKLE="$APP/Contents/Frameworks/Sparkle.framework/Versions/B"
-for item in "$SPARKLE"/XPCServices/*.xpc "$SPARKLE/Autoupdate" "$SPARKLE/Updater.app"; do
-    [ -e "$item" ] && codesign --force --sign "$SIGN_IDENTITY" "$item"
-done
-codesign --force --sign "$SIGN_IDENTITY" "$APP/Contents/Frameworks/Sparkle.framework"
 codesign --force --sign "$SIGN_IDENTITY" \
     --entitlements "$SRC/Claude UsageRelease.entitlements" "$APP"
 codesign --verify --deep --strict "$APP"

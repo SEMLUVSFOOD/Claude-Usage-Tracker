@@ -40,33 +40,4 @@ enum Typography {
 
 /// Text styles with built-in colors for common use cases
 extension Text {
-    func settingsTitle() -> some View {
-        self.font(Typography.title)
-            .foregroundColor(.primary)
-    }
-
-    func settingsSubtitle() -> some View {
-        self.font(Typography.subtitle)
-            .foregroundColor(.primary)
-    }
-
-    func settingsSectionHeader() -> some View {
-        self.font(Typography.sectionHeader)
-            .foregroundColor(.primary)
-    }
-
-    func settingsBody() -> some View {
-        self.font(Typography.body)
-            .foregroundColor(.primary)
-    }
-
-    func settingsCaption() -> some View {
-        self.font(Typography.caption)
-            .foregroundColor(.secondary)
-    }
-
-    func settingsLabel() -> some View {
-        self.font(Typography.label)
-            .foregroundColor(.primary)
-    }
 }

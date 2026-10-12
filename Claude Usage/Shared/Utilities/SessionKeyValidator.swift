@@ -158,17 +158,6 @@ struct SessionKeyValidator {
         return trimmed
     }
 
-    /// Validate and return a Result type
-    /// - Parameter sessionKey: The session key to validate
-    /// - Returns: Result containing sanitized key or error
-    func validateResult(_ sessionKey: String) -> Result<String, Error> {
-        do {
-            return .success(try validate(sessionKey))
-        } catch {
-            return .failure(error)
-        }
-    }
-
     // MARK: - Private Validation Helpers
 
     private func performSecurityChecks(_ sessionKey: String) throws {
@@ -214,18 +203,6 @@ struct SessionKeyValidator {
 
     // MARK: - Sanitization
 
-    /// Sanitize a session key for storage (additional layer of security)
-    /// - Parameter sessionKey: The validated session key
-    /// - Returns: Sanitized session key safe for storage
-    func sanitizeForStorage(_ sessionKey: String) -> String {
-        // Remove any potential padding or encoding issues
-        return sessionKey
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .replacingOccurrences(of: "\r\n", with: "")
-            .replacingOccurrences(of: "\n", with: "")
-            .replacingOccurrences(of: "\r", with: "")
-    }
-
     // MARK: - Quick Validation
 
     /// Quick validation check (less strict, for UI feedback)
@@ -256,17 +233,6 @@ struct SessionKeyValidator {
 // MARK: - Convenience Extensions
 
 extension String {
-    /// Validate this string as a session key
-    /// - Parameter configuration: Optional validator configuration
-    /// - Throws: SessionKeyValidationError if invalid
-    /// - Returns: Sanitized session key
-    func validateAsSessionKey(
-        configuration: SessionKeyValidator.Configuration = .default
-    ) throws -> String {
-        let validator = SessionKeyValidator(configuration: configuration)
-        return try validator.validate(self)
-    }
-
     /// Check if this string is a valid session key
     var isValidSessionKey: Bool {
         let validator = SessionKeyValidator()

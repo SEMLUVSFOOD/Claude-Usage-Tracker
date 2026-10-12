@@ -4,9 +4,8 @@
 //
 //  Created by Claude Code on 2026-07-15.
 //
-//  Wraps the pre-existing Anthropic fetch chain behind UsageProviderService.
-//  The bodies below were MOVED VERBATIM from MenuBarManager (multi-profile
-//  path) and its single-profile refresh path — behavior must stay identical.
+//  Anthropic usage: claude.ai session key, Claude Code OAuth credentials, or
+//  (for the default-login profile) Claude Code's system keychain login.
 //
 
 import Foundation
@@ -16,24 +15,20 @@ final class AnthropicUsageProvider: UsageProviderService {
 
     let provider: Provider = .anthropic
 
-    // Concrete type: the per-profile fetch overloads (sessionKey/oauthAccessToken)
-    // are not part of APIServiceProtocol.
     private let apiService: ClaudeAPIService
 
     init(apiService: ClaudeAPIService = ClaudeAPIService()) {
         self.apiService = apiService
     }
 
-    /// Profile credentials plus the system-keychain CLI fallback that
-    /// `ClaudeAPIService.getAuthentication()` can discover during the actual
-    /// API call (mirrors the old `MenuBarManager.hasAnyAvailableCredentials`).
+    /// Profile credentials plus the system-keychain CLI fallback (which
+    /// `fetchUsage` only uses for the default-login profile).
     func hasCredentials(for profile: Profile) -> Bool {
         profile.hasUsageCredentials
             || ClaudeCodeSyncService.shared.hasUsableSystemCredentials()
     }
 
     /// Fetches usage data for a specific profile using its credentials.
-    /// (Moved verbatim from `MenuBarManager.fetchUsageForProfile(_:)`.)
     func fetchUsage(for profile: Profile) async throws -> ClaudeUsage {
         // Priority 1: claude.ai session key (cookie-based)
         if let sessionKey = profile.claudeSessionKey,
@@ -89,10 +84,4 @@ final class AnthropicUsageProvider: UsageProviderService {
         )
     }
 
-    /// The single-profile refresh path historically used the no-arg
-    /// `fetchUsageData()`, whose internal `getAuthentication()` chain covers
-    /// the active profile plus system-level fallbacks. Keep that exact path.
-    func fetchUsageForActiveProfile(_ profile: Profile) async throws -> ClaudeUsage {
-        try await apiService.fetchUsageData()
-    }
 }

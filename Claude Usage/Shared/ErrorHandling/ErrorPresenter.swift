@@ -84,11 +84,6 @@ class ErrorPresenter {
 
     // MARK: - Toast Notifications
 
-    /// Show a brief error toast
-    func showToast(for error: AppError) {
-        showTooltip("⚠️ \(error.message)")
-    }
-
     private func showTooltip(_ message: String) {
         // For macOS, we can use NSUserNotification or create a custom tooltip window
         // This is a simplified version
@@ -100,10 +95,6 @@ class ErrorPresenter {
 
     // MARK: - Error Details View
 
-    /// Get a SwiftUI view for error details
-    func errorDetailsView(for error: AppError) -> some View {
-        ErrorDetailsView(error: error)
-    }
 }
 
 // MARK: - SwiftUI Error Details View

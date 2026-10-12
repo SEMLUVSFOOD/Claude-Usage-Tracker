@@ -147,40 +147,9 @@ class ErrorRecovery {
         return min(delay, max)
     }
 
-    private func linearBackoff(attempt: Int, increment: Double = 1.0) -> TimeInterval {
-        return Double(attempt) * increment
-    }
-
     // MARK: - Circuit Breaker
 
     private var circuitBreakerState: [ErrorCategory: CircuitState] = [:]
-
-    /// Check if circuit breaker is open for a category
-    func isCircuitOpen(for category: ErrorCategory) -> Bool {
-        guard let state = circuitBreakerState[category] else {
-            return false
-        }
-
-        switch state {
-        case .open(let openedAt):
-            // Circuit opens for 60 seconds
-            let timeSinceOpen = Date().timeIntervalSince(openedAt)
-            if timeSinceOpen > 60 {
-                // Try half-open
-                circuitBreakerState[category] = .halfOpen
-                return false
-            }
-            return true
-
-        case .halfOpen, .closed:
-            return false
-        }
-    }
-
-    /// Record a failure for circuit breaker
-    func recordFailure(for category: ErrorCategory) {
-        circuitBreakerState[category] = .open(openedAt: Date())
-    }
 
     /// Record a success for circuit breaker
     func recordSuccess(for category: ErrorCategory) {

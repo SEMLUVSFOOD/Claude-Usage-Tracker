@@ -17,7 +17,6 @@ class ProfileStore {
     private enum Keys {
         static let profiles = "profiles_v3"
         static let activeProfileId = "activeProfileId"
-        static let displayMode = "profileDisplayMode"
         static let multiProfileConfig = "multiProfileDisplayConfig"
     }
 
@@ -95,11 +94,6 @@ class ProfileStore {
                 } else {
                     profiles[i].claudeSessionKey = keychainService.loadProfileSecret(profileId: id, field: .claudeSessionKey)
                 }
-                if profiles[i].apiSessionKey != nil {
-                    plistHadSecrets = true
-                } else {
-                    profiles[i].apiSessionKey = keychainService.loadProfileSecret(profileId: id, field: .apiSessionKey)
-                }
                 if profiles[i].cliCredentialsJSON != nil {
                     plistHadSecrets = true
                 } else {
@@ -138,7 +132,6 @@ class ProfileStore {
     private func persistSecrets(of profile: Profile) -> Bool {
         var ok = true
         ok = persistSecret(profile.claudeSessionKey, profile.id, .claudeSessionKey) && ok
-        ok = persistSecret(profile.apiSessionKey, profile.id, .apiSessionKey) && ok
         ok = persistSecret(profile.cliCredentialsJSON, profile.id, .cliCredentialsJSON) && ok
         ok = persistSecret(profile.codexCredentialsJSON, profile.id, .codexCredentialsJSON) && ok
         ok = persistSecret(profile.antigravityCredentialsJSON, profile.id, .antigravityCredentialsJSON) && ok
@@ -167,18 +160,6 @@ class ProfileStore {
             return nil
         }
         return UUID(uuidString: uuidString)
-    }
-
-    func saveDisplayMode(_ mode: ProfileDisplayMode) {
-        defaults.set(mode.rawValue, forKey: Keys.displayMode)
-    }
-
-    func loadDisplayMode() -> ProfileDisplayMode {
-        guard let rawValue = defaults.string(forKey: Keys.displayMode),
-              let mode = ProfileDisplayMode(rawValue: rawValue) else {
-            return .single
-        }
-        return mode
     }
 
     // MARK: - Multi-Profile Display Config
@@ -215,8 +196,6 @@ class ProfileStore {
         // Update credentials directly in profile
         profiles[index].claudeSessionKey = credentials.claudeSessionKey
         profiles[index].organizationId = credentials.organizationId
-        profiles[index].apiSessionKey = credentials.apiSessionKey
-        profiles[index].apiOrganizationId = credentials.apiOrganizationId
         profiles[index].cliCredentialsJSON = credentials.cliCredentialsJSON
 
         saveProfiles(profiles)
@@ -231,8 +210,6 @@ class ProfileStore {
         return ProfileCredentials(
             claudeSessionKey: profile.claudeSessionKey,
             organizationId: profile.organizationId,
-            apiSessionKey: profile.apiSessionKey,
-            apiOrganizationId: profile.apiOrganizationId,
             cliCredentialsJSON: profile.cliCredentialsJSON
         )
     }

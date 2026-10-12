@@ -14,163 +14,12 @@ class KeychainService {
 
     private init() {}
 
-    /// Keychain item identifiers
-    enum KeychainKey: String {
-        case apiSessionKey = "com.claudeusagetracker.api-session-key"
-        case claudeSessionKey = "com.claudeusagetracker.claude-session-key"
-
-        var service: String {
-            return rawValue
-        }
-
-        var account: String {
-            return "session-key"
-        }
-    }
-
-    // MARK: - Public Methods
-
-    /// Saves a string value to the Keychain
-    /// - Parameters:
-    ///   - value: The string value to save
-    ///   - key: The keychain key identifier
-    /// - Throws: KeychainError if save fails
-    func save(_ value: String, for key: KeychainKey) throws {
-        guard let data = value.data(using: .utf8) else {
-            throw KeychainError.invalidData
-        }
-
-        // First, try to update existing item
-        let updateQuery: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: key.service,
-            kSecAttrAccount as String: key.account
-        ]
-
-        let attributes: [String: Any] = [
-            kSecValueData as String: data
-        ]
-
-        let updateStatus = SecItemUpdate(updateQuery as CFDictionary, attributes as CFDictionary)
-
-        if updateStatus == errSecSuccess {
-            LoggingService.shared.log("Keychain: Updated \(key.service)")
-            return
-        }
-
-        // If update fails because item doesn't exist, add new item
-        if updateStatus == errSecItemNotFound {
-            // Create access control that doesn't require password
-            var accessControlError: Unmanaged<CFError>?
-            guard let accessControl = SecAccessControlCreateWithFlags(
-                kCFAllocatorDefault,
-                kSecAttrAccessibleWhenUnlocked,
-                [],
-                &accessControlError
-            ) else {
-                if let error = accessControlError?.takeRetainedValue() {
-                    LoggingService.shared.log("Failed to create access control: \(error)")
-                }
-                throw KeychainError.saveFailed(status: errSecParam)
-            }
-
-            let addQuery: [String: Any] = [
-                kSecClass as String: kSecClassGenericPassword,
-                kSecAttrService as String: key.service,
-                kSecAttrAccount as String: key.account,
-                kSecValueData as String: data,
-                kSecAttrAccessControl as String: accessControl,
-                kSecAttrSynchronizable as String: false
-            ]
-
-            let addStatus = SecItemAdd(addQuery as CFDictionary, nil)
-
-            if addStatus == errSecSuccess {
-                LoggingService.shared.log("Keychain: Added \(key.service)")
-                return
-            } else {
-                throw KeychainError.saveFailed(status: addStatus)
-            }
-        } else {
-            throw KeychainError.saveFailed(status: updateStatus)
-        }
-    }
-
-    /// Loads a string value from the Keychain
-    /// - Parameter key: The keychain key identifier
-    /// - Returns: The stored string value, or nil if not found
-    /// - Throws: KeychainError if load fails (other than item not found)
-    func load(for key: KeychainKey) throws -> String? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: key.service,
-            kSecAttrAccount as String: key.account,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
-
-        var result: AnyObject?
-        let status = SecItemCopyMatching(query as CFDictionary, &result)
-
-        if status == errSecSuccess {
-            guard let data = result as? Data,
-                  let value = String(data: data, encoding: .utf8) else {
-                throw KeychainError.invalidData
-            }
-            LoggingService.shared.log("Keychain: Loaded \(key.service)")
-            return value
-        } else if status == errSecItemNotFound {
-            LoggingService.shared.log("Keychain: Item not found \(key.service)")
-            return nil
-        } else {
-            throw KeychainError.loadFailed(status: status)
-        }
-    }
-
-    /// Deletes a value from the Keychain
-    /// - Parameter key: The keychain key identifier
-    /// - Throws: KeychainError if delete fails (ignores item not found)
-    func delete(for key: KeychainKey) throws {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: key.service,
-            kSecAttrAccount as String: key.account
-        ]
-
-        let status = SecItemDelete(query as CFDictionary)
-
-        if status == errSecSuccess {
-            LoggingService.shared.log("Keychain: Deleted \(key.service)")
-        } else if status == errSecItemNotFound {
-            // Item not found is not an error for delete
-            LoggingService.shared.log("Keychain: Item not found for deletion \(key.service)")
-        } else {
-            throw KeychainError.deleteFailed(status: status)
-        }
-    }
-
-    /// Checks if a value exists in the Keychain
-    /// - Parameter key: The keychain key identifier
-    /// - Returns: true if the item exists, false otherwise
-    func exists(for key: KeychainKey) -> Bool {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: key.service,
-            kSecAttrAccount as String: key.account,
-            kSecReturnData as String: false
-        ]
-
-        let status = SecItemCopyMatching(query as CFDictionary, nil)
-        return status == errSecSuccess
-    }
-
     // MARK: - Per-Profile Credential Storage (#267 / GHSA-mfxh-xpwm-23c7)
 
     /// Per-profile credential fields stored in the Keychain instead of the
     /// `profiles_v3` UserDefaults plist (which is cleartext on disk).
     enum ProfileSecretField: String, CaseIterable {
         case claudeSessionKey = "claude-session-key"
-        case apiSessionKey = "api-session-key"
         case cliCredentialsJSON = "cli-credentials"
         case codexCredentialsJSON = "codex-credentials"
         case antigravityCredentialsJSON = "antigravity-credentials"
@@ -302,20 +151,6 @@ class KeychainService {
     /// keychain. Keep using it; macOS asks once per build to "Always Allow"
     /// instead of the profiles silently losing their credentials.
     private let fileBasedFallbackAllowed = true
-
-    /// Whether per-profile secret storage is usable in this build.
-    /// Probes with a throwaway item; with the file-based fallback this only
-    /// fails when BOTH keychains reject us.
-    var isProfileSecretStorageAvailable: Bool {
-        let probeAccount = "availability-probe"
-        do {
-            try saveItem("probe", service: Self.profileSecretsService, account: probeAccount)
-            _ = deleteItem(service: Self.profileSecretsService, account: probeAccount)
-            return true
-        } catch {
-            return false
-        }
-    }
 
     private func noteStatus(_ status: OSStatus) {
         if status == errSecMissingEntitlement {

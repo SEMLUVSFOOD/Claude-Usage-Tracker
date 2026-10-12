@@ -40,45 +40,13 @@ final class LoggingService {
 
     // MARK: - Storage Logging
 
-    func logStorageSave(_ key: String) {
-        os_log("💾 Storage Save: %{public}@", log: storageLogger, type: .debug, key)
-    }
-
-    func logStorageLoad(_ key: String, success: Bool) {
-        if success {
-            os_log("📂 Storage Load: %{public}@ ✓", log: storageLogger, type: .debug, key)
-        } else {
-            os_log("📂 Storage Load: %{public}@ ✗ (not found)", log: storageLogger, type: .debug, key)
-        }
-    }
-
     func logStorageError(_ operation: String, error: Error) {
         os_log("❌ Storage Error [%{public}@]: %{public}@", log: storageLogger, type: .error, operation, error.localizedDescription)
     }
 
     // MARK: - Notification Logging
 
-    func logNotificationSent(_ type: String) {
-        os_log("🔔 Notification Sent: %{public}@", log: notificationLogger, type: .info, type)
-    }
-
-    func logNotificationError(_ error: Error) {
-        os_log("❌ Notification Error: %{public}@", log: notificationLogger, type: .error, error.localizedDescription)
-    }
-
-    func logNotificationPermission(_ granted: Bool) {
-        os_log("🔐 Notification Permission: %{public}@", log: notificationLogger, type: .info, granted ? "Granted" : "Denied")
-    }
-
     // MARK: - UI Logging
-
-    func logUIEvent(_ event: String) {
-        os_log("🖱️ UI Event: %{public}@", log: uiLogger, type: .debug, event)
-    }
-
-    func logWindowEvent(_ event: String) {
-        os_log("🪟 Window Event: %{public}@", log: uiLogger, type: .debug, event)
-    }
 
     // MARK: - General Logging
 
@@ -102,7 +70,4 @@ final class LoggingService {
         os_log("ℹ️ %{public}@", log: generalLogger, type: .info, message)
     }
 
-    func logDebug(_ message: String) {
-        os_log("🐛 %{public}@", log: generalLogger, type: .debug, message)
-    }
 }

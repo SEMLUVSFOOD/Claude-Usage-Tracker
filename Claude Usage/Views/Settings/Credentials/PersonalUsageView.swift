@@ -174,7 +174,7 @@ struct PersonalUsageView: View {
             loadExistingConfiguration()
             loadCurrentCredentials()
         }
-        .onChange(of: profileManager.activeProfile?.id) { _, _ in
+        .onChange(of: profileManager.editingProfile?.id) { _, _ in
             // Reload when profile changes
             loadExistingConfiguration()
             loadCurrentCredentials()
@@ -194,7 +194,7 @@ struct PersonalUsageView: View {
     }
 
     private func loadExistingConfiguration() {
-        guard let profile = profileManager.activeProfile else { return }
+        guard let profile = profileManager.editingProfile else { return }
 
         // Load existing credentials for comparison
         if let creds = try? ProfileStore.shared.loadProfileCredentials(profile.id) {
@@ -204,7 +204,7 @@ struct PersonalUsageView: View {
     }
 
     private func loadCurrentCredentials() {
-        guard let profile = profileManager.activeProfile else { return }
+        guard let profile = profileManager.editingProfile else { return }
         currentCredentials = try? ProfileStore.shared.loadProfileCredentials(profile.id)
     }
 
@@ -216,7 +216,7 @@ struct PersonalUsageView: View {
     }
 
     private func removeCredentials() {
-        guard let profileId = profileManager.activeProfile?.id else {
+        guard let profileId = profileManager.editingProfile?.id else {
             LoggingService.shared.logError("PersonalUsageView: No active profile for removal")
             return
         }
@@ -226,9 +226,6 @@ struct PersonalUsageView: View {
         do {
             // Use ProfileManager's shared removal method
             try profileManager.removeClaudeAICredentials(for: profileId)
-
-            // Update statusline scripts if installed
-            try? StatuslineService.shared.updateScriptsIfInstalled()
 
             // Reload UI to update the view
             loadCurrentCredentials()
@@ -705,7 +702,7 @@ struct ConfirmStep: View {
     }
 
     private func saveConfiguration() {
-        guard let profileId = ProfileManager.shared.activeProfile?.id else { return }
+        guard let profileId = ProfileManager.shared.editingProfile?.id else { return }
 
         isSaving = true
 
@@ -718,19 +715,15 @@ struct ConfirmStep: View {
                 try ProfileStore.shared.saveProfileCredentials(profileId, credentials: creds)
 
                 // Also update the Profile model with the new credentials
-                if var profile = ProfileManager.shared.activeProfile {
+                if var profile = ProfileManager.shared.editingProfile {
                     profile.claudeSessionKey = wizardState.sessionKey
                     profile.organizationId = wizardState.selectedOrgId
                     ProfileManager.shared.updateProfile(profile)
                     LoggingService.shared.log("PersonalUsageView: Updated profile model with new credentials")
                 }
 
-                // Update statusline scripts if key or org changed (only if already installed)
                 let keyChanged = keyHasChanged()
                 let orgChanged = wizardState.selectedOrgId != wizardState.originalOrgId
-                if keyChanged || orgChanged {
-                    try? StatuslineService.shared.updateScriptsIfInstalled()
-                }
 
                 await MainActor.run {
                     // Reset circuit breaker on successful credential save

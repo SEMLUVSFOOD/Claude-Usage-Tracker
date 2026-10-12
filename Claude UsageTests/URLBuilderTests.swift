@@ -56,14 +56,6 @@ final class URLBuilderTests: XCTestCase {
         XCTAssertEqual(url.absoluteString, "https://api.example.com/users/123/profile")
     }
 
-    func testAppendPathComponents() throws {
-        let url = try URLBuilder(baseURL: "https://api.example.com")
-            .appendingPathComponents(["/users", "123", "/profile"])
-            .build()
-
-        XCTAssertEqual(url.absoluteString, "https://api.example.com/users/123/profile")
-    }
-
     func testPathTraversalPrevention() {
         XCTAssertThrowsError(
             try URLBuilder(baseURL: "https://api.example.com")
@@ -98,16 +90,6 @@ final class URLBuilderTests: XCTestCase {
         XCTAssertTrue(url.absoluteString.contains("limit=10"))
     }
 
-    func testAddQueryParametersDictionary() throws {
-        let url = try URLBuilder(baseURL: "https://api.example.com")
-            .appendingPath("/search")
-            .addingQueryParameters(["q": "test", "limit": "10"])
-            .build()
-
-        XCTAssertTrue(url.absoluteString.contains("q=test"))
-        XCTAssertTrue(url.absoluteString.contains("limit=10"))
-    }
-
     func testEmptyParameterName() {
         XCTAssertThrowsError(
             try URLBuilder(baseURL: "https://api.example.com")
@@ -122,42 +104,12 @@ final class URLBuilderTests: XCTestCase {
 
     // MARK: - Convenience Method Tests
 
-    func testClaudeAPIBuilder() throws {
-        let url = try URLBuilder.claudeAPI(endpoint: "/organizations").build()
-        XCTAssertEqual(url.absoluteString, "https://claude.ai/api/organizations")
-    }
-
-    func testConsoleAPIBuilder() throws {
-        let url = try URLBuilder.consoleAPI(endpoint: "/organizations").build()
-        XCTAssertEqual(url.absoluteString, "https://console.anthropic.com/api/organizations")
-    }
-
     func testClaudeStatusBuilder() throws {
         let url = try URLBuilder.claudeStatus(endpoint: "/status.json").build()
         XCTAssertEqual(url.absoluteString, "https://status.claude.com/api/v2/status.json")
     }
 
     // MARK: - Complex URL Tests
-
-    func testComplexClaudeURL() throws {
-        let orgId = "org_123"
-        let conversationId = "conv_456"
-
-        let url = try URLBuilder.claudeAPI()
-            .appendingPathComponents([
-                "/organizations",
-                orgId,
-                "/chat_conversations",
-                conversationId,
-                "/completion"
-            ])
-            .build()
-
-        XCTAssertEqual(
-            url.absoluteString,
-            "https://claude.ai/api/organizations/org_123/chat_conversations/conv_456/completion"
-        )
-    }
 
     // MARK: - Result Type Tests
 
