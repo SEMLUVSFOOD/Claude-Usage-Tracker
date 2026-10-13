@@ -365,6 +365,8 @@ struct FollowClaudeCodeToggle: View {
                 Text("Follow Claude Code")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(.primary)
+                    .lineLimit(1)
+                    .fixedSize()
 
                 if isOn && hasSwitcher {
                     if isLinked, let folderName {
@@ -425,11 +427,11 @@ struct KeepAwakeToggle: View {
             Text("Keep Mac awake")
                 .font(.system(size: 11, weight: .medium))
                 .foregroundColor(.primary)
+                .lineLimit(1)
+                .fixedSize()
 
-            if isOn {
-                Text(workingCount > 0
-                     ? "\(workingCount) session\(workingCount == 1 ? "" : "s") working"
-                     : "while Claude Code works")
+            if isOn && workingCount > 0 {
+                Text("\(workingCount) working")
                     .font(.system(size: 10))
                     .foregroundColor(.secondary)
                     .lineLimit(1)
@@ -445,7 +447,7 @@ struct KeepAwakeToggle: View {
         }
         .padding(.horizontal, 20)
         .padding(.top, 8)
-        .help("Prevents idle sleep while a Claude Code session is working; the screen can still turn off")
+        .help("Keeps the Mac from sleeping while a Claude Code session is working; the screen can still turn off")
     }
 }
 
