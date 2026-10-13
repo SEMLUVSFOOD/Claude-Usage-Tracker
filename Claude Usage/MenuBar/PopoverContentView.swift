@@ -569,6 +569,62 @@ struct SmartUsageDashboard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
+            if let groups = usage.quotaGroups, groups.count > 1 {
+                ForEach(groups) { group in
+                    groupRows(group)
+                }
+            } else {
+                standardRows
+            }
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 8)
+    }
+
+    /// One separately metered model group (e.g. Antigravity's Gemini / Claude & GPT)
+    @ViewBuilder
+    private func groupRows(_ group: QuotaGroup) -> some View {
+        Text(group.displayName.uppercased())
+            .font(.system(size: 9, weight: .semibold))
+            .foregroundColor(.secondary)
+            .padding(.top, group.id == usage.quotaGroups?.first?.id ? 0 : 4)
+            .padding(.leading, 2)
+        if let session = group.sessionPercentage {
+            UsageRow(
+                title: "menubar.session_usage".localized,
+                subtitle: "menubar.5_hour_window".localized,
+                usedPercentage: group.sessionResetTime.map { $0 < Date() } == true ? 0 : session,
+                showRemaining: showRemainingPercentage,
+                resetTime: group.sessionResetTime,
+                periodDuration: Constants.sessionWindow,
+                showTimeMarker: showTimeMarker,
+                showPaceMarker: showPaceMarker,
+                usePaceColoring: usePaceColoring,
+                timeDisplay: timeDisplay,
+                forecast: UsageForecast.make(usedPercentage: session, resetTime: group.sessionResetTime,
+                                             windowDuration: Constants.sessionWindow)
+            )
+        }
+        if let weekly = group.weeklyPercentage {
+            UsageRow(
+                title: "Weekly limit",
+                subtitle: nil,
+                usedPercentage: weekly,
+                showRemaining: showRemainingPercentage,
+                resetTime: group.weeklyResetTime,
+                periodDuration: Constants.weeklyWindow,
+                showTimeMarker: showTimeMarker,
+                showPaceMarker: showPaceMarker,
+                usePaceColoring: usePaceColoring,
+                timeDisplay: timeDisplay,
+                forecast: UsageForecast.make(usedPercentage: weekly, resetTime: group.weeklyResetTime,
+                                             windowDuration: Constants.weeklyWindow)
+            )
+        }
+    }
+
+    @ViewBuilder
+    private var standardRows: some View {
             // Primary: Session Usage
             UsageRow(
                 title: "menubar.session_usage".localized,
@@ -707,9 +763,6 @@ struct SmartUsageDashboard: View {
                 .padding(.top, 2)
             }
 
-        }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
     }
 }
 
@@ -809,7 +862,7 @@ struct UsageRow: View {
 
                 Spacer()
 
-                Text("\(Int(displayPercentage))%")
+                Text("\(Int(displayPercentage.rounded()))%")
                     .font(.system(size: 13, weight: .semibold, design: .rounded))
                     .foregroundColor(statusColor)
             }

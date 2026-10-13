@@ -538,7 +538,7 @@ final class MenuBarIconRenderer {
         let attributed = NSMutableAttributedString()
 
         // Session number
-        let sessionText = "\(Int(sessionPercentage))"
+        let sessionText = "\(Int(sessionPercentage.rounded()))"
         attributed.append(NSAttributedString(string: sessionText, attributes: [
             .font: font,
             .foregroundColor: sessionColor
@@ -550,7 +550,7 @@ final class MenuBarIconRenderer {
                 .font: font,
                 .foregroundColor: separatorColor
             ]))
-            let weekText = "\(Int(weekPct))"
+            let weekText = "\(Int(weekPct.rounded()))"
             attributed.append(NSAttributedString(string: weekText, attributes: [
                 .font: font,
                 .foregroundColor: weekColor

@@ -56,6 +56,11 @@ struct ClaudeUsage: Codable, Equatable {
     var lastUpdated: Date
     var userTimezone: TimeZone
 
+    /// Separately metered model groups (e.g. Antigravity's "Gemini" and
+    /// "Claude & GPT"). The top-level session/weekly values stay the most
+    /// constrained of these, for the menu bar icon and Stats.
+    var quotaGroups: [QuotaGroup]? = nil
+
     /// Remaining percentage (100 - used percentage)
     var remainingPercentage: Double {
         max(0, 100 - effectiveSessionPercentage)
@@ -143,6 +148,7 @@ extension ClaudeUsage {
         case overageBalance, overageBalanceCurrency
         case planType, creditsBalance, creditsUnlimited
         case lastUpdated, userTimezone
+        case quotaGroups
     }
 
     init(from decoder: Decoder) throws {
@@ -176,7 +182,27 @@ extension ClaudeUsage {
             creditsBalance: try c.decodeIfPresent(Double.self, forKey: .creditsBalance),
             creditsUnlimited: try c.decodeIfPresent(Bool.self, forKey: .creditsUnlimited),
             lastUpdated: try c.decodeIfPresent(Date.self, forKey: .lastUpdated) ?? Date(),
-            userTimezone: try c.decodeIfPresent(TimeZone.self, forKey: .userTimezone) ?? .current
+            userTimezone: try c.decodeIfPresent(TimeZone.self, forKey: .userTimezone) ?? .current,
+            quotaGroups: (try? c.decodeIfPresent([QuotaGroup].self, forKey: .quotaGroups)) ?? nil
         )
+    }
+}
+
+/// One separately metered model group with its own 5-hour and weekly limits
+struct QuotaGroup: Codable, Equatable, Identifiable {
+    var name: String
+    var sessionPercentage: Double?
+    var sessionResetTime: Date?
+    var weeklyPercentage: Double?
+    var weeklyResetTime: Date?
+
+    var id: String { name }
+
+    /// "Gemini Models" → "Gemini", "Claude and GPT models" → "Claude & GPT"
+    var displayName: String {
+        let lowered = name.lowercased()
+        if lowered.contains("gemini") { return "Gemini" }
+        if lowered.contains("claude") || lowered.contains("gpt") { return "Claude & GPT" }
+        return name
     }
 }

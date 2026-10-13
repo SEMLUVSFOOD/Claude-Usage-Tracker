@@ -243,6 +243,22 @@ final class AntigravityAPIService {
             ?? Date().addingTimeInterval(7 * 24 * 60 * 60)
         usage.lastUpdated = Date()
         usage.userTimezone = .current
+
+        // Per group, in the order Google lists them
+        var groupNames: [String] = []
+        for window in windows where !groupNames.contains(window.group) { groupNames.append(window.group) }
+        usage.quotaGroups = groupNames.map { name in
+            let group = windows.filter { $0.group == name }
+            let groupSession = group.filter { $0.cadence != .weekly }.max { $0.usedPercent < $1.usedPercent }
+            let groupWeekly = group.filter { $0.cadence == .weekly }.max { $0.usedPercent < $1.usedPercent }
+            return QuotaGroup(
+                name: name,
+                sessionPercentage: groupSession?.usedPercent,
+                sessionResetTime: groupSession?.resetTime,
+                weeklyPercentage: groupWeekly?.usedPercent,
+                weeklyResetTime: groupWeekly?.resetTime
+            )
+        }
         return usage
     }
 }
