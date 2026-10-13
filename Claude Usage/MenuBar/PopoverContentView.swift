@@ -66,6 +66,26 @@ struct PopoverContentView: View {
     @StateObject private var profileManager = ProfileManager.shared
     @ObservedObject private var followService = ClaudeCodeFollowService.shared
     @ObservedObject private var activity = ClaudeCodeActivityMonitor.shared
+    /// Collapsed accounts (profile UUIDs, comma-separated); remembered across launches
+    @AppStorage("collapsedProfileIds") private var collapsedProfileIds = ""
+
+    private var collapsed: Set<String> {
+        Set(collapsedProfileIds.split(separator: ",").map(String.init))
+    }
+
+    private func toggleCollapsed(_ id: UUID) {
+        var set = collapsed
+        if set.contains(id.uuidString) { set.remove(id.uuidString) } else { set.insert(id.uuidString) }
+        collapsedProfileIds = set.sorted().joined(separator: ",")
+    }
+
+    private func summary(for profile: Profile) -> ProfileUsageTag.CollapsedSummary {
+        let signedOut = (profile.provider == .antigravity && !profile.hasUsageCredentials)
+            || !profileManager.canFetchUsage(for: profile)
+        guard !signedOut else { return .notSignedIn }
+        let usage = profile.claudeUsage ?? .empty
+        return .usage(session: usage.effectiveSessionPercentage, weekly: usage.weeklyPercentage)
+    }
 
     private func refreshWithSpinner() {
         withAnimation(.easeInOut(duration: 0.3)) { isRefreshing = true }
@@ -114,9 +134,14 @@ struct PopoverContentView: View {
                         ? (profile.id == menuBarProfileId ? .shown : .selectable)
                         : nil,
                     onShowInMenuBar: { profileManager.setMenuBarProfile(profile.id) },
-                    accessory: index == 0 ? headerControls : nil
+                    accessory: index == 0 ? headerControls : nil,
+                    isCollapsed: collapsed.contains(profile.id.uuidString),
+                    onToggleCollapse: { toggleCollapsed(profile.id) },
+                    collapsedSummary: summary(for: profile)
                 )
-                if profile.provider == .antigravity && !profile.hasUsageCredentials {
+                if collapsed.contains(profile.id.uuidString) {
+                    EmptyView()
+                } else if profile.provider == .antigravity && !profile.hasUsageCredentials {
                     AntigravitySignInCard(profileId: profile.id)
                 } else if !profileManager.canFetchUsage(for: profile) {
                     NotSignedInCard(onOpenSettings: onPreferences)
@@ -181,7 +206,13 @@ struct PopoverContentView: View {
 struct ProfileUsageTag: View {
     enum MenuBarSelection {
         case shown       // This profile drives the menu bar icon
-        case selectable  // Clicking the row makes this profile drive the icon
+        case selectable  // Clicking the name makes this profile drive the icon
+    }
+
+    /// Compact numbers shown in the row while the account is collapsed
+    enum CollapsedSummary {
+        case usage(session: Double, weekly: Double)
+        case notSignedIn
     }
 
     let profile: Profile
@@ -189,19 +220,72 @@ struct ProfileUsageTag: View {
     var onShowInMenuBar: () -> Void = {}
     /// Extra controls at the trailing edge (top row: status, refresh, settings)
     var accessory: AnyView? = nil
+    var isCollapsed = false
+    var onToggleCollapse: (() -> Void)? = nil
+    var collapsedSummary: CollapsedSummary? = nil
 
     @State private var isHovered = false
 
     var body: some View {
-        let row = HStack(spacing: 8) {
+        HStack(spacing: 4) {
+            if let onToggleCollapse {
+                Button(action: onToggleCollapse) {
+                    Image(systemName: "chevron.right")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(.secondary)
+                        .rotationEffect(.degrees(isCollapsed ? 0 : 90))
+                        .frame(width: 16, height: 22)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help(isCollapsed ? "Show \(profile.name)" : "Hide \(profile.name)")
+            }
+
+            if menuBarSelection == .selectable {
+                Button(action: onShowInMenuBar) {
+                    mainArea.contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Show \(profile.name) in the menu bar")
+                .onHover { hovering in
+                    withAnimation(.easeInOut(duration: 0.15)) { isHovered = hovering }
+                }
+            } else {
+                mainArea
+            }
+
+            if let accessory {
+                accessory
+            }
+        }
+        .padding(.leading, onToggleCollapse == nil ? 14 : 6)
+        .padding(.trailing, 14)
+        .padding(.vertical, 6)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.primary.opacity(isHovered && menuBarSelection == .selectable ? 0.07 : 0.03))
+        )
+        .padding(.horizontal, 10)
+        .padding(.top, 6)
+    }
+
+    private var mainArea: some View {
+        HStack(spacing: 8) {
             ProviderBrandMark(provider: profile.provider, size: 20)
 
             Text(profile.name)
                 .font(.system(size: 11, weight: .semibold))
                 .foregroundColor(.primary)
                 .lineLimit(1)
+                .frame(minWidth: 44, alignment: .leading)
+                .layoutPriority(1)
 
-            Spacer()
+            Spacer(minLength: 4)
+
+            if isCollapsed, let collapsedSummary {
+                // The top row also carries the controls: drop the labels there
+                summaryView(collapsedSummary, compact: accessory != nil)
+            }
 
             switch menuBarSelection {
             case .shown:
@@ -217,33 +301,38 @@ struct ProfileUsageTag: View {
             case nil:
                 EmptyView()
             }
-
-            if let accessory = accessory {
-                accessory
-            }
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 6)
-                .fill(Color.primary.opacity(isHovered && menuBarSelection == .selectable ? 0.07 : 0.03))
-        )
-        .padding(.horizontal, 10)
-        .padding(.top, 6)
+    }
 
-        if menuBarSelection == .selectable {
-            Button(action: onShowInMenuBar) {
-                row.contentShape(Rectangle())
+    @ViewBuilder
+    private func summaryView(_ summary: CollapsedSummary, compact: Bool) -> some View {
+        switch summary {
+        case .usage(let session, let weekly):
+            HStack(spacing: 3) {
+                if !compact { Text("5h").foregroundColor(.secondary) }
+                Text("\(Int(session.rounded()))%").foregroundColor(color(for: session))
+                Text("·").foregroundColor(.secondary)
+                if !compact { Text("wk").foregroundColor(.secondary) }
+                Text("\(Int(weekly.rounded()))%").foregroundColor(color(for: weekly))
             }
-            .buttonStyle(.plain)
-            .help("Show \(profile.name) in the menu bar")
-            .onHover { hovering in
-                withAnimation(.easeInOut(duration: 0.15)) {
-                    isHovered = hovering
-                }
-            }
-        } else {
-            row
+            .help("5-hour session · weekly")
+            .font(.system(size: 10, weight: .semibold, design: .rounded))
+            .lineLimit(1)
+            .fixedSize()
+        case .notSignedIn:
+            Text("Not signed in")
+                .font(.system(size: 10))
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+                .fixedSize()
+        }
+    }
+
+    private func color(for percentage: Double) -> Color {
+        switch percentage {
+        case ..<50: return .adaptiveGreen
+        case ..<80: return .orange
+        default: return .red
         }
     }
 }
