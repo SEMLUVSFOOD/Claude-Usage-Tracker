@@ -95,64 +95,20 @@ struct PopoverContentView: View {
         }
     }
 
-    private var headerControls: AnyView {
-        AnyView(CombinedHeaderControls(
-            status: manager.status,
-            isRefreshing: isRefreshing,
-            onRefresh: refreshWithSpinner,
-            onPreferences: onPreferences
-        ))
-    }
-
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
-            if let lastRefresh = manager.lastSuccessfulRefreshTime,
-               Date().timeIntervalSince(lastRefresh) > 300 {
-                StatusBannerView(
-                    icon: "clock.fill",
-                    message: "Updated \(Int(Date().timeIntervalSince(lastRefresh) / 60)) min ago",
-                    color: .orange,
-                    onTap: onRefresh
-                )
-            }
-
             let profiles = profileManager.popoverProfiles
             let menuBarProfileId = profileManager.menuBarProfile?.id
 
-            if profiles.isEmpty {
-                emptyState
-            }
-
-            ForEach(Array(profiles.enumerated()), id: \.element.id) { index, profile in
-                if index > 0 {
-                    PopoverDivider()
-                        .padding(.top, 6)
-                }
-                ProfileUsageTag(
-                    profile: profile,
-                    menuBarSelection: profiles.count > 1
-                        ? (profile.id == menuBarProfileId ? .shown : .selectable)
-                        : nil,
-                    onShowInMenuBar: { profileManager.setMenuBarProfile(profile.id) },
-                    accessory: index == 0 ? headerControls : nil,
-                    isCollapsed: collapsed.contains(profile.id.uuidString),
-                    onToggleCollapse: { toggleCollapsed(profile.id) },
-                    collapsedSummary: summary(for: profile)
-                )
-                if collapsed.contains(profile.id.uuidString) {
-                    EmptyView()
-                } else if profile.provider == .antigravity && !profile.hasUsageCredentials {
-                    AntigravitySignInCard(profileId: profile.id)
-                } else if !profileManager.canFetchUsage(for: profile) {
-                    NotSignedInCard(onOpenSettings: onPreferences)
-                } else {
-                    SmartUsageDashboard(usage: profile.claudeUsage ?? .empty, provider: profile.provider)
-                }
-            }
+            PopoverHeader(
+                status: manager.status,
+                statusPageURL: profileManager.menuBarProfile?.provider.descriptor.statusPageURL,
+                isRefreshing: isRefreshing,
+                onRefresh: refreshWithSpinner,
+                onPreferences: onPreferences
+            )
 
             if profiles.count > 1 {
-                PopoverDivider()
-                    .padding(.top, 6)
                 FollowClaudeCodeToggle(
                     isOn: profileManager.multiProfileConfig.followClaudeCode,
                     folderName: followService.currentFolder?.name,
@@ -169,9 +125,52 @@ struct PopoverContentView: View {
                     onChange: { on in activity.update { $0.keepAwake = on } }
                 )
             }
+
+            PopoverDivider()
+                .padding(.top, 10)
+
+            if let lastRefresh = manager.lastSuccessfulRefreshTime,
+               Date().timeIntervalSince(lastRefresh) > 300 {
+                StatusBannerView(
+                    icon: "clock.fill",
+                    message: "Updated \(Int(Date().timeIntervalSince(lastRefresh) / 60)) min ago",
+                    color: .orange,
+                    onTap: onRefresh
+                )
+            }
+
+            if profiles.isEmpty {
+                emptyState
+            }
+
+            ForEach(Array(profiles.enumerated()), id: \.element.id) { index, profile in
+                if index > 0 && !collapsed.contains(profiles[index - 1].id.uuidString) {
+                    PopoverDivider()
+                        .padding(.top, 6)
+                }
+                ProfileUsageTag(
+                    profile: profile,
+                    menuBarSelection: profiles.count > 1
+                        ? (profile.id == menuBarProfileId ? .shown : .selectable)
+                        : nil,
+                    onShowInMenuBar: { profileManager.setMenuBarProfile(profile.id) },
+                    isCollapsed: collapsed.contains(profile.id.uuidString),
+                    onToggleCollapse: { toggleCollapsed(profile.id) },
+                    collapsedSummary: summary(for: profile)
+                )
+                if collapsed.contains(profile.id.uuidString) {
+                    EmptyView()
+                } else if profile.provider == .antigravity && !profile.hasUsageCredentials {
+                    AntigravitySignInCard(profileId: profile.id)
+                } else if !profileManager.canFetchUsage(for: profile) {
+                    NotSignedInCard(onOpenSettings: onPreferences)
+                } else {
+                    SmartUsageDashboard(usage: profile.claudeUsage ?? .empty, provider: profile.provider)
+                }
+            }
         }
         .padding(.top, 4)
-        .padding(.bottom, 14)
+        .padding(.bottom, 12)
         .frame(width: 280)
         .background(VisualEffectBackground())
         .opacity(appeared ? 1 : 0)
@@ -184,12 +183,8 @@ struct PopoverContentView: View {
 
     private var emptyState: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("No accounts shown")
-                    .font(.system(size: 12, weight: .semibold))
-                Spacer()
-                headerControls
-            }
+            Text("No accounts shown")
+                .font(.system(size: 12, weight: .semibold))
             Text("Add a Claude, Codex or Google account in Settings.")
                 .font(.system(size: 11))
                 .foregroundColor(.secondary)
@@ -218,8 +213,6 @@ struct ProfileUsageTag: View {
     let profile: Profile
     var menuBarSelection: MenuBarSelection? = nil
     var onShowInMenuBar: () -> Void = {}
-    /// Extra controls at the trailing edge (top row: status, refresh, settings)
-    var accessory: AnyView? = nil
     var isCollapsed = false
     var onToggleCollapse: (() -> Void)? = nil
     var collapsedSummary: CollapsedSummary? = nil
@@ -253,10 +246,6 @@ struct ProfileUsageTag: View {
             } else {
                 mainArea
             }
-
-            if let accessory {
-                accessory
-            }
         }
         .padding(.leading, onToggleCollapse == nil ? 14 : 6)
         .padding(.trailing, 14)
@@ -283,8 +272,7 @@ struct ProfileUsageTag: View {
             Spacer(minLength: 4)
 
             if isCollapsed, let collapsedSummary {
-                // The top row also carries the controls: drop the labels there
-                summaryView(collapsedSummary, compact: accessory != nil)
+                summaryView(collapsedSummary)
             }
 
             switch menuBarSelection {
@@ -305,14 +293,14 @@ struct ProfileUsageTag: View {
     }
 
     @ViewBuilder
-    private func summaryView(_ summary: CollapsedSummary, compact: Bool) -> some View {
+    private func summaryView(_ summary: CollapsedSummary) -> some View {
         switch summary {
         case .usage(let session, let weekly):
             HStack(spacing: 3) {
-                if !compact { Text("5h").foregroundColor(.secondary) }
+                Text("5h").foregroundColor(.secondary)
                 Text("\(Int(session.rounded()))%").foregroundColor(color(for: session))
                 Text("·").foregroundColor(.secondary)
-                if !compact { Text("wk").foregroundColor(.secondary) }
+                Text("wk").foregroundColor(.secondary)
                 Text("\(Int(weekly.rounded()))%").foregroundColor(color(for: weekly))
             }
             .help("5-hour session · weekly")
@@ -540,12 +528,14 @@ struct KeepAwakeToggle: View {
     }
 }
 
-// MARK: - Combined Header Controls
+// MARK: - Popover Header
 
-/// Service status dot + refresh + settings, shown on the top profile row in
-/// the dropdown.
-struct CombinedHeaderControls: View {
+/// Top row of the dropdown: service status of the menu bar account's
+/// provider, refresh and settings.
+struct PopoverHeader: View {
     let status: ClaudeStatus
+    /// Statuspage API URL of the provider (nil = no status page)
+    let statusPageURL: URL?
     let isRefreshing: Bool
     let onRefresh: () -> Void
     let onPreferences: () -> Void
@@ -560,37 +550,42 @@ struct CombinedHeaderControls: View {
         }
     }
 
+    /// "https://status.claude.com/api/v2/status.json" → "https://status.claude.com"
+    private var statusPage: URL? {
+        guard let host = statusPageURL?.host else { return nil }
+        return URL(string: "https://\(host)")
+    }
+
     var body: some View {
-        HStack(alignment: .center, spacing: 0) {
-            Button(action: {
-                if let url = URL(string: "https://status.claude.com") {
-                    NSWorkspace.shared.open(url)
+        HStack(spacing: 6) {
+            Button {
+                if let statusPage { NSWorkspace.shared.open(statusPage) }
+            } label: {
+                HStack(spacing: 6) {
+                    Circle()
+                        .fill(statusColor)
+                        .frame(width: 7, height: 7)
+                        .frame(width: 12)
+                    Text(statusPage == nil ? "No status page" : status.description)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
                 }
-            }) {
-                Circle()
-                    .fill(statusColor)
-                    .frame(width: 6, height: 6)
-                    .frame(width: 18, height: 24)
-                    .contentShape(Rectangle())
+                .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .help(status.description)
+            .disabled(statusPage == nil)
+            .help(statusPage.map { "Open \($0.host ?? "the status page")" } ?? "")
 
-            HeaderIconButton(
-                icon: "arrow.clockwise",
-                isRefreshing: isRefreshing,
-                action: onRefresh
-            )
-            .disabled(isRefreshing)
+            Spacer(minLength: 4)
 
-            HeaderIconButton(
-                icon: "gearshape.fill",
-                fontSize: 12,
-                action: onPreferences
-            )
+            HeaderIconButton(icon: "arrow.clockwise", isRefreshing: isRefreshing, action: onRefresh)
+                .disabled(isRefreshing)
+            HeaderIconButton(icon: "gearshape.fill", fontSize: 12, action: onPreferences)
         }
-        .padding(.vertical, -4)
-        .padding(.trailing, -6)
+        .padding(.leading, 20)
+        .padding(.trailing, 14)
+        .padding(.top, 4)
     }
 }
 
