@@ -95,10 +95,51 @@ struct PopoverContentView: View {
         }
     }
 
+    /// Header + switches: always visible at the top
+    @State private var headerHeight: CGFloat = 0
+    /// Natural height of the accounts list
+    @State private var accountsHeight: CGFloat = 0
+
+    /// Room for the accounts list below the header, leaving space for the
+    /// popover arrow and margins, so the dropdown never runs off the screen
+    private var accountsMaxHeight: CGFloat {
+        max(160, manager.availableHeight - headerHeight - 48)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
+            headerSection
+                .background(HeightReader<HeaderHeightKey>())
+
+            if accountsHeight > accountsMaxHeight {
+                // Too tall for the screen: only the accounts scroll
+                ScrollView(.vertical) {
+                    accountsSection
+                        .background(HeightReader<AccountsHeightKey>())
+                }
+                .frame(height: accountsMaxHeight)
+            } else {
+                accountsSection
+                    .background(HeightReader<AccountsHeightKey>())
+            }
+        }
+        .onPreferenceChange(HeaderHeightKey.self) { headerHeight = $0 }
+        .onPreferenceChange(AccountsHeightKey.self) { accountsHeight = $0 }
+        .padding(.top, 4)
+        .padding(.bottom, 12)
+        .frame(width: 280)
+        .background(VisualEffectBackground())
+        .opacity(appeared ? 1 : 0)
+        .scaleEffect(appeared ? 1 : 0.96, anchor: .top)
+        .onAppear {
+            appeared = false
+            withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) { appeared = true }
+        }
+    }
+
+    private var headerSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
             let profiles = profileManager.popoverProfiles
-            let menuBarProfileId = profileManager.menuBarProfile?.id
 
             PopoverHeader(
                 status: manager.status,
@@ -128,6 +169,13 @@ struct PopoverContentView: View {
 
             PopoverDivider()
                 .padding(.top, 10)
+        }
+    }
+
+    private var accountsSection: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            let profiles = profileManager.popoverProfiles
+            let menuBarProfileId = profileManager.menuBarProfile?.id
 
             if let lastRefresh = manager.lastSuccessfulRefreshTime,
                Date().timeIntervalSince(lastRefresh) > 300 {
@@ -168,16 +216,6 @@ struct PopoverContentView: View {
                     SmartUsageDashboard(usage: profile.claudeUsage ?? .empty, provider: profile.provider)
                 }
             }
-        }
-        .padding(.top, 4)
-        .padding(.bottom, 12)
-        .frame(width: 280)
-        .background(VisualEffectBackground())
-        .opacity(appeared ? 1 : 0)
-        .scaleEffect(appeared ? 1 : 0.96, anchor: .top)
-        .onAppear {
-            appeared = false
-            withAnimation(.spring(response: 0.32, dampingFraction: 0.82)) { appeared = true }
         }
     }
 
@@ -525,6 +563,27 @@ struct KeepAwakeToggle: View {
         .padding(.horizontal, 20)
         .padding(.top, 8)
         .help("Keeps the Mac from sleeping while a Claude Code session is working; the screen can still turn off")
+    }
+}
+
+// MARK: - Height measuring
+
+struct HeaderHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+
+struct AccountsHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+
+/// Reports the height of the view it's the background of
+struct HeightReader<Key: PreferenceKey>: View where Key.Value == CGFloat {
+    var body: some View {
+        GeometryReader { geometry in
+            Color.clear.preference(key: Key.self, value: geometry.size.height)
+        }
     }
 }
 

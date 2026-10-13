@@ -9,6 +9,9 @@ final class MenuBarManager: NSObject, ObservableObject {
     @Published private(set) var status: ClaudeStatus = .unknown
     @Published private(set) var isRefreshing = false
     @Published private(set) var lastSuccessfulRefreshTime: Date?
+    /// Usable height of the screen the menu bar icon is on (below the menu
+    /// bar, above the Dock); the dropdown never grows taller than this.
+    @Published private(set) var availableHeight: CGFloat = 800
 
     private let profileManager = ProfileManager.shared
     private let renderer = MenuBarIconRenderer()
@@ -297,6 +300,9 @@ final class MenuBarManager: NSObject, ObservableObject {
         if popover.isShown {
             closePopover()
         } else if Date().timeIntervalSince(lastPopoverCloseDate) > 0.25 {
+            if let screen = sender.window?.screen ?? NSScreen.main {
+                availableHeight = screen.visibleFrame.height
+            }
             popover.contentViewController = makeContentViewController()
             popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .minY)
             if let window = popover.contentViewController?.view.window {
