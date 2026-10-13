@@ -526,7 +526,10 @@ struct SmartUsageDashboard: View {
                 showTimeMarker: showTimeMarker,
                 showPaceMarker: showPaceMarker,
                 usePaceColoring: usePaceColoring,
-                timeDisplay: timeDisplay
+                timeDisplay: timeDisplay,
+                forecast: UsageForecast.make(usedPercentage: usage.effectiveSessionPercentage,
+                                             resetTime: usage.sessionResetTime,
+                                             windowDuration: Constants.sessionWindow)
             )
 
             if usage.designWeeklyTokensUsed > 0 {
@@ -554,7 +557,10 @@ struct SmartUsageDashboard: View {
                 showTimeMarker: showTimeMarker,
                 showPaceMarker: showPaceMarker,
                 usePaceColoring: usePaceColoring,
-                timeDisplay: timeDisplay
+                timeDisplay: timeDisplay,
+                forecast: UsageForecast.make(usedPercentage: usage.weeklyPercentage,
+                                             resetTime: usage.weeklyResetTime,
+                                             windowDuration: Constants.weeklyWindow)
             )
 
             if usage.fableWeeklyTokensUsed > 0 {
@@ -666,6 +672,8 @@ struct UsageRow: View {
     var showPaceMarker: Bool = true
     var usePaceColoring: Bool = true
     var timeDisplay: PopoverTimeDisplay = .resetTime
+    /// "At this pace" projection, shown under the reset time
+    var forecast: UsageForecast? = nil
 
     private var displayPercentage: Double {
         UsageStatusCalculator.getDisplayPercentage(
@@ -779,6 +787,18 @@ struct UsageRow: View {
                 Text(resetTimeText(for: reset))
                     .font(.system(size: 9))
                     .foregroundColor(.secondary)
+            }
+
+            if let forecast {
+                HStack(spacing: 3) {
+                    if forecast.runsOut {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 8))
+                    }
+                    Text(forecast.text())
+                        .font(.system(size: 9, weight: forecast.runsOut ? .medium : .regular))
+                }
+                .foregroundColor(forecast.runsOut ? .orange : .secondary)
             }
         }
         .padding(.horizontal, 10)
