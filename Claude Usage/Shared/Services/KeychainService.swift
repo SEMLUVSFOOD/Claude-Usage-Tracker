@@ -114,6 +114,28 @@ class KeychainService {
         }
     }
 
+    // MARK: - App-wide secrets (not tied to a profile)
+
+    /// Stores (nil deletes) an app-wide secret, e.g. the Discord webhook URL.
+    @discardableResult
+    func saveAppSecret(_ value: String?, account: String) -> Bool {
+        let key = "app.\(account)"
+        guard let value else {
+            _ = deleteItem(service: Self.profileSecretsService, account: key)
+            return true
+        }
+        do {
+            try saveItem(value, service: Self.profileSecretsService, account: key)
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    func loadAppSecret(account: String) -> String? {
+        try? loadItem(service: Self.profileSecretsService, account: "app.\(account)")
+    }
+
     // MARK: - Generic SecItem Helpers (data-protection keychain, file-based fallback)
     //
     // Per-profile secrets PREFER the DATA-PROTECTION keychain

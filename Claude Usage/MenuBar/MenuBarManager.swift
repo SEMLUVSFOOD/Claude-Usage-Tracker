@@ -45,6 +45,7 @@ final class MenuBarManager: NSObject, ObservableObject {
         popover = makePopover()
         observeChanges()
         ClaudeCodeFollowService.shared.start()
+        ClaudeCodeActivityMonitor.shared.start()
         updateIcon()
 
         refreshTimer = Timer.scheduledTimer(withTimeInterval: Self.refreshInterval, repeats: true) { [weak self] _ in
@@ -57,6 +58,7 @@ final class MenuBarManager: NSObject, ObservableObject {
     }
 
     func cleanup() {
+        ClaudeCodeActivityMonitor.shared.stop()
         refreshTimer?.invalidate()
         observers.forEach { NotificationCenter.default.removeObserver($0) }
         observers.removeAll()
@@ -85,6 +87,14 @@ final class MenuBarManager: NSObject, ObservableObject {
             self.lastAppearanceName = change.newValue?.name
             self.updateIcon()
         }
+        // Heartbeat while a Claude Code session is working
+        let activity = ClaudeCodeActivityMonitor.shared
+        activity.$sessions.combineLatest(activity.$settings)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] sessions, settings in
+                self?.setHeartbeat(settings.pulseIcon && sessions.values.contains { $0.state == .working })
+            }
+            .store(in: &cancellables)
         // Usage saved by a refresh or a Google sign-in redraws the icon
         profileManager.$profiles
             .dropFirst()
@@ -221,6 +231,39 @@ final class MenuBarManager: NSObject, ObservableObject {
         }
         image.isTemplate = monochrome && !config.showPaceMarker
         return image
+    }
+
+    // MARK: - Heartbeat
+
+    private static let heartbeatKey = "claudeCodeHeartbeat"
+
+    /// A "lub-dub" opacity pulse on the status button's layer. Core Animation
+    /// runs it in the render server, so it costs no CPU and survives icon
+    /// redraws. With Reduce Motion on it's a slow, gentle fade instead.
+    private func setHeartbeat(_ on: Bool) {
+        guard let button = statusItem?.button else { return }
+        button.wantsLayer = true
+        guard let layer = button.layer else { return }
+        let running = layer.animation(forKey: Self.heartbeatKey) != nil
+        if on && !running {
+            let pulse = CAKeyframeAnimation(keyPath: "opacity")
+            if NSWorkspace.shared.accessibilityDisplayShouldReduceMotion {
+                pulse.values = [1.0, 0.55, 1.0]
+                pulse.keyTimes = [0, 0.5, 1]
+                pulse.duration = 3.0
+            } else {
+                // lub (deep dip), dub (smaller dip), then rest
+                pulse.values = [1.0, 0.3, 1.0, 0.55, 1.0, 1.0]
+                pulse.keyTimes = [0, 0.1, 0.22, 0.32, 0.45, 1]
+                pulse.duration = 1.3
+            }
+            pulse.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            pulse.repeatCount = .infinity
+            pulse.isRemovedOnCompletion = false
+            layer.add(pulse, forKey: Self.heartbeatKey)
+        } else if !on && running {
+            layer.removeAnimation(forKey: Self.heartbeatKey)
+        }
     }
 
     // MARK: - Popover

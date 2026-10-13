@@ -65,6 +65,7 @@ struct PopoverContentView: View {
     @State private var appeared = false
     @StateObject private var profileManager = ProfileManager.shared
     @ObservedObject private var followService = ClaudeCodeFollowService.shared
+    @ObservedObject private var activity = ClaudeCodeActivityMonitor.shared
 
     private func refreshWithSpinner() {
         withAnimation(.easeInOut(duration: 0.3)) { isRefreshing = true }
@@ -135,9 +136,17 @@ struct PopoverContentView: View {
                     onChange: { profileManager.setFollowClaudeCode($0) }
                 )
             }
+
+            if profiles.contains(where: { $0.provider.descriptor.capabilities.cliAccountSync }) {
+                KeepAwakeToggle(
+                    isOn: activity.settings.keepAwake,
+                    workingCount: activity.workingCount,
+                    onChange: { on in activity.update { $0.keepAwake = on } }
+                )
+            }
         }
         .padding(.top, 4)
-        .padding(.bottom, 8)
+        .padding(.bottom, 14)
         .frame(width: 280)
         .background(VisualEffectBackground())
         .opacity(appeared ? 1 : 0)
@@ -351,6 +360,7 @@ struct FollowClaudeCodeToggle: View {
                 Image(systemName: "link")
                     .font(.system(size: 10, weight: .semibold))
                     .foregroundColor(isOn ? .accentColor : .secondary)
+                    .frame(width: 12)
 
                 Text("Follow Claude Code")
                     .font(.system(size: 11, weight: .medium))
@@ -394,6 +404,48 @@ struct FollowClaudeCodeToggle: View {
         .padding(.horizontal, 20)
         .padding(.top, 8)
         .help("Show the account Claude Code is currently using in the menu bar")
+    }
+}
+
+// MARK: - Keep Awake Toggle
+
+/// Keeps the Mac from idle-sleeping while a Claude Code session is working.
+struct KeepAwakeToggle: View {
+    let isOn: Bool
+    let workingCount: Int
+    let onChange: (Bool) -> Void
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Image(systemName: isOn && workingCount > 0 ? "cup.and.saucer.fill" : "cup.and.saucer")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(isOn ? .accentColor : .secondary)
+                .frame(width: 12)
+
+            Text("Keep Mac awake")
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(.primary)
+
+            if isOn {
+                Text(workingCount > 0
+                     ? "\(workingCount) session\(workingCount == 1 ? "" : "s") working"
+                     : "while Claude Code works")
+                    .font(.system(size: 10))
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+
+            Toggle("", isOn: Binding(get: { isOn }, set: onChange))
+                .toggleStyle(.switch)
+                .controlSize(.mini)
+                .labelsHidden()
+                .focusEffectDisabled()
+        }
+        .padding(.horizontal, 20)
+        .padding(.top, 8)
+        .help("Prevents idle sleep while a Claude Code session is working; the screen can still turn off")
     }
 }
 
