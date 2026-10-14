@@ -162,7 +162,7 @@ struct PopoverContentView: View {
             if profiles.contains(where: { $0.provider.descriptor.capabilities.cliAccountSync }) {
                 KeepAwakeToggle(
                     isOn: activity.settings.keepAwake,
-                    workingCount: activity.workingCount,
+                    activityLabel: activity.activityLabel,
                     onChange: { on in activity.update { $0.keepAwake = on } }
                 )
             }
@@ -529,12 +529,13 @@ struct FollowClaudeCodeToggle: View {
 /// Keeps the Mac from idle-sleeping while a Claude Code session is working.
 struct KeepAwakeToggle: View {
     let isOn: Bool
-    let workingCount: Int
+    /// "2 working", "Claude in use"… (nil when nothing is active)
+    let activityLabel: String?
     let onChange: (Bool) -> Void
 
     var body: some View {
         HStack(spacing: 6) {
-            Image(systemName: isOn && workingCount > 0 ? "cup.and.saucer.fill" : "cup.and.saucer")
+            Image(systemName: isOn && activityLabel != nil ? "cup.and.saucer.fill" : "cup.and.saucer")
                 .font(.system(size: 10, weight: .semibold))
                 .foregroundColor(isOn ? .accentColor : .secondary)
                 .frame(width: 12)
@@ -545,8 +546,8 @@ struct KeepAwakeToggle: View {
                 .lineLimit(1)
                 .fixedSize()
 
-            if isOn && workingCount > 0 {
-                Text("\(workingCount) working")
+            if isOn, let activityLabel {
+                Text(activityLabel)
                     .font(.system(size: 10))
                     .foregroundColor(.secondary)
                     .lineLimit(1)
@@ -562,7 +563,7 @@ struct KeepAwakeToggle: View {
         }
         .padding(.horizontal, 20)
         .padding(.top, 8)
-        .help("Keeps the Mac from sleeping while a Claude Code session is working; the screen can still turn off")
+        .help("Keeps the Mac from sleeping while Claude Code works or an account's usage is rising; the screen can still turn off")
     }
 }
 

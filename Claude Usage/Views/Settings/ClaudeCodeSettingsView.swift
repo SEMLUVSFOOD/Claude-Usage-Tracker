@@ -33,7 +33,7 @@ struct ClaudeCodeSettingsView: View {
                     subtitle: "Keep your Mac awake and get alerts while Claude Code works."
                 )
 
-                SettingsSectionCard(title: "While Claude Code works", subtitle: nil) {
+                SettingsSectionCard(title: "While you're working", subtitle: nil) {
                     VStack(alignment: .leading, spacing: DesignTokens.Spacing.medium) {
                         SettingToggle(
                             title: "Pulse the menu bar icon",
@@ -41,8 +41,13 @@ struct ClaudeCodeSettingsView: View {
                             isOn: binding(\.pulseIcon)
                         )
                         SettingToggle(
-                            title: "Keep Mac awake while Claude Code works",
-                            description: "Prevents idle sleep until every session finishes or waits for you. The screen can still turn off. Closing the lid still sleeps a MacBook unless it's on power with an external display.",
+                            title: "Also count usage on websites and apps",
+                            description: "An account whose usage rises (claude.ai, the Claude app, Codex, Antigravity; checked every minute) counts as active for 5 minutes. Gemini app usage isn't visible: Google meters it separately from Antigravity.",
+                            isOn: binding(\.countAccountUsage)
+                        )
+                        SettingToggle(
+                            title: "Keep Mac awake while active",
+                            description: "Prevents idle sleep while a Claude Code session works or an account is in use. The screen can still turn off. Closing the lid still sleeps a MacBook unless it's on power with an external display.",
                             isOn: binding(\.keepAwake)
                         )
                     }

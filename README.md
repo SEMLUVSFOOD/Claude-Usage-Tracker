@@ -10,7 +10,7 @@ One icon sits in the menu bar and shows one account; the dropdown lists all of t
 
 Settings → **Stats** keeps a local, 90-day history of every account shown in the dropdown: session and weekly charts, weekly limit used per day, use by hour of day, average session and window peak, limit hits, and a projection of where the week will end.
 
-Settings → **Claude Code** adds live Claude Code activity via [hooks](https://docs.claude.com/en/docs/claude-code/hooks): the menu bar icon pulses like a heartbeat while a session works, an optional switch keeps the Mac awake until Claude finishes, and alerts (Mac notification and/or a Discord webhook) tell you when Claude needs permission or input, or is done. The hooks are added to each Claude Code folder's `settings.json` (a backup is kept) only while one of these options is on.
+Settings → **Claude Code** adds live Claude Code activity via [hooks](https://docs.claude.com/en/docs/claude-code/hooks): the menu bar icon pulses like a heartbeat while a session works, an optional switch keeps the Mac awake until Claude finishes, and alerts (Mac notification and/or a Discord webhook) tell you when Claude needs permission or input, or is done. With *Also count usage on websites and apps*, an account whose usage rises (claude.ai, the Claude app, Codex, Antigravity) also counts as active for 5 minutes. The hooks are added to each Claude Code folder's `settings.json` (a backup is kept) only while one of these options is on.
 
 Forked from [hamed-elfayome/Claude-Usage-Tracker](https://github.com/hamed-elfayome/Claude-Usage-Tracker) and stripped down to just this.
 

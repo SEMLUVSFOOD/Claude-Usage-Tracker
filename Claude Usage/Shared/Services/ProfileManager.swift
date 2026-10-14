@@ -210,10 +210,13 @@ class ProfileManager: ObservableObject {
 
     func saveClaudeUsage(_ usage: ClaudeUsage, for profileId: UUID) {
         guard let index = profiles.firstIndex(where: { $0.id == profileId }) else { return }
+        let previous = profiles[index].claudeUsage
         profiles[index].claudeUsage = usage
         if activeProfile?.id == profileId { activeProfile = profiles[index] }
         profileStore.saveProfiles(profiles)
         UsageHistoryStore.shared.record(usage, for: profileId)
+        ClaudeCodeActivityMonitor.shared.noteUsage(profileId: profileId, provider: profiles[index].provider,
+                                                   previous: previous, current: usage)
     }
 }
 

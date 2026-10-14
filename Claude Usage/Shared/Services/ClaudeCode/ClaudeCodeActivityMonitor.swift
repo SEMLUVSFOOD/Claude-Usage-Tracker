@@ -22,6 +22,9 @@ struct ClaudeCodeActivitySettings: Codable, Equatable {
     var discord = false
     /// Only alert after the Mac has been idle for a couple of minutes
     var onlyWhenAway = true
+    /// Also treat a rise in any account's usage (claude.ai, the Claude app,
+    /// Codex, Antigravity…) as activity for the heartbeat and keep awake
+    var countAccountUsage = true
 
     var anyFeatureOn: Bool { pulseIcon || keepAwake || alertOnNeedsInput || alertOnFinished }
 
@@ -38,6 +41,7 @@ struct ClaudeCodeActivitySettings: Codable, Equatable {
         macNotifications = try c.decodeIfPresent(Bool.self, forKey: .macNotifications) ?? d.macNotifications
         discord = try c.decodeIfPresent(Bool.self, forKey: .discord) ?? d.discord
         onlyWhenAway = try c.decodeIfPresent(Bool.self, forKey: .onlyWhenAway) ?? d.onlyWhenAway
+        countAccountUsage = try c.decodeIfPresent(Bool.self, forKey: .countAccountUsage) ?? d.countAccountUsage
     }
 }
 
@@ -58,8 +62,29 @@ final class ClaudeCodeActivityMonitor: NSObject, ObservableObject {
     @Published private(set) var sessions: [String: Session] = [:]
     @Published private(set) var installProblems: [String] = []
     @Published private(set) var isKeepingAwake = false
+    /// Accounts whose usage rose recently, and until when they count as active
+    @Published private(set) var activeAccounts: [UUID: ActiveAccount] = [:]
+    /// A Claude Code session is working, or an account is in use
+    @Published private(set) var isActive = false
+
+    struct ActiveAccount: Equatable {
+        var until: Date
+        var provider: Provider
+    }
 
     var workingCount: Int { sessions.values.filter { $0.state == .working }.count }
+
+    /// Short status for the dropdown: "2 working", "Claude in use"…
+    var activityLabel: String? {
+        if workingCount > 0 { return "\(workingCount) working" }
+        let providers = Set(activeAccounts.values.map(\.provider))
+        guard !providers.isEmpty else { return nil }
+        let names = Provider.allCases.filter(providers.contains).map { $0 == .antigravity ? "Antigravity" : $0.descriptor.displayName }
+        return names.joined(separator: ", ") + " in use"
+    }
+
+    /// An account counts as active this long after its usage last rose
+    private static let accountActiveFor: TimeInterval = 5 * 60
 
     private static let settingsKey = "claudeCodeActivitySettings"
     private static let discordAccount = "discordWebhookURL"
@@ -132,8 +157,9 @@ final class ClaudeCodeActivityMonitor: NSObject, ObservableObject {
             timer?.invalidate()
             timer = nil
             sessions = [:]
+            activeAccounts = [:]
         }
-        updateAssertion()
+        recompute()
     }
 
     /// Re-installs hooks (e.g. after adding a Claude Code folder)
@@ -181,6 +207,63 @@ final class ClaudeCodeActivityMonitor: NSObject, ObservableObject {
         for (id, session) in sessions where session.state == .working && now.timeIntervalSince(session.lastEvent) > Self.staleAfter {
             sessions[id]?.state = .idle
         }
+        recompute()
+    }
+
+    // MARK: - Account usage activity
+
+    /// Called with each new usage reading; a rise marks the account active.
+    func noteUsage(profileId: UUID, provider: Provider, previous: ClaudeUsage?, current: ClaudeUsage) {
+        guard settings.countAccountUsage, settings.anyFeatureOn, let previous,
+              Self.usageIncreased(from: previous, to: current) else { return }
+        activeAccounts[profileId] = ActiveAccount(until: Date().addingTimeInterval(Self.accountActiveFor), provider: provider)
+        recompute()
+    }
+
+    /// Whether `current` shows more usage than `previous`. A previous reading
+    /// older than 10 minutes (e.g. saved before the app started) never counts,
+    /// so launching the app doesn't look like activity.
+    static func usageIncreased(from previous: ClaudeUsage, to current: ClaudeUsage) -> Bool {
+        let now = current.lastUpdated
+        guard now.timeIntervalSince(previous.lastUpdated) < 10 * 60, now > previous.lastUpdated else { return false }
+
+        func rose(_ old: Double?, oldReset: Date?, _ new: Double?, newReset: Date?) -> Bool {
+            guard let new else { return false }
+            // A window that has reset since the last reading started from 0
+            let oldValue = (oldReset.map { $0 <= now } ?? false) ? 0 : (old ?? 0)
+            let newValue = (newReset.map { $0 <= now } ?? false) ? 0 : new
+            return newValue > oldValue + 0.01
+        }
+
+        if rose(previous.sessionPercentage, oldReset: previous.sessionResetTime,
+                current.sessionPercentage, newReset: current.sessionResetTime)
+            || rose(previous.weeklyPercentage, oldReset: previous.weeklyResetTime,
+                    current.weeklyPercentage, newReset: current.weeklyResetTime) {
+            return true
+        }
+        // Separately metered groups (Antigravity): a rise in a group that isn't
+        // the most constrained one doesn't move the top-level numbers
+        for group in current.quotaGroups ?? [] {
+            let old = previous.quotaGroups?.first { $0.name == group.name }
+            if rose(old?.sessionPercentage, oldReset: old?.sessionResetTime,
+                    group.sessionPercentage, newReset: group.sessionResetTime)
+                || rose(old?.weeklyPercentage, oldReset: old?.weeklyResetTime,
+                        group.weeklyPercentage, newReset: group.weeklyResetTime) {
+                return true
+            }
+        }
+        return false
+    }
+
+    /// Drops expired account activity and updates isActive + the assertion.
+    private func recompute() {
+        let now = Date()
+        if activeAccounts.values.contains(where: { $0.until <= now }) {
+            activeAccounts = activeAccounts.filter { $0.value.until > now }
+        }
+        if !settings.countAccountUsage && !activeAccounts.isEmpty { activeAccounts = [:] }
+        let active = workingCount > 0 || !activeAccounts.isEmpty
+        if isActive != active { isActive = active }
         updateAssertion()
     }
 
@@ -244,13 +327,13 @@ final class ClaudeCodeActivityMonitor: NSObject, ObservableObject {
     // MARK: - Keep awake
 
     private func updateAssertion() {
-        let shouldHold = settings.keepAwake && workingCount > 0
+        let shouldHold = settings.keepAwake && isActive
         if shouldHold && assertionID == 0 {
             // Prevents idle *system* sleep; the display may still turn off
             let result = IOPMAssertionCreateWithName(
                 kIOPMAssertionTypePreventUserIdleSystemSleep as CFString,
                 IOPMAssertionLevel(kIOPMAssertionLevelOn),
-                "Claude Code is working" as CFString,
+                "Claude Code or an AI account is in use" as CFString,
                 &assertionID
             )
             if result != kIOReturnSuccess { assertionID = 0 }

@@ -92,10 +92,10 @@ final class MenuBarManager: NSObject, ObservableObject {
         }
         // Heartbeat while a Claude Code session is working
         let activity = ClaudeCodeActivityMonitor.shared
-        activity.$sessions.combineLatest(activity.$settings)
+        activity.$isActive.combineLatest(activity.$settings)
             .receive(on: DispatchQueue.main)
-            .sink { [weak self] sessions, settings in
-                self?.setHeartbeat(settings.pulseIcon && sessions.values.contains { $0.state == .working })
+            .sink { [weak self] isActive, settings in
+                self?.setHeartbeat(settings.pulseIcon && isActive)
             }
             .store(in: &cancellables)
         // Usage saved by a refresh or a Google sign-in redraws the icon
