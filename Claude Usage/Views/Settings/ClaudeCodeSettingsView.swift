@@ -14,6 +14,8 @@ struct ClaudeCodeSettingsView: View {
     @State private var testResult: String?
     @State private var isTesting = false
     @State private var folders = ClaudeCodeHookInstaller.status()
+    @State private var lidError: String?
+    @State private var lidPermissionInstalled = LidSleepController.isPermissionInstalled
 
     private func binding(_ keyPath: WritableKeyPath<ClaudeCodeActivitySettings, Bool>) -> Binding<Bool> {
         Binding(
@@ -47,7 +49,7 @@ struct ClaudeCodeSettingsView: View {
                         )
                         SettingToggle(
                             title: "Keep Mac awake",
-                            description: "Prevents idle sleep. Closing the lid still sleeps a MacBook unless it's on power with an external display.",
+                            description: "Prevents idle sleep",
                             isOn: binding(\.keepAwake)
                         )
                         if monitor.settings.keepAwake {
@@ -64,6 +66,35 @@ struct ClaudeCodeSettingsView: View {
                                 description: "Stops the display from turning off and locking while keeping awake",
                                 isOn: binding(\.keepScreenOn)
                             )
+                            SettingToggle(
+                                title: "Stay awake with the lid closed",
+                                description: "Needs your password once. Turns off below \(LidSleepController.minimumBatteryPercent)% battery and when Claude Usage quits. Don't put the Mac in a bag while it's on: it can overheat.",
+                                isOn: Binding(
+                                    get: { monitor.settings.keepAwakeLidClosed },
+                                    set: { on in
+                                        lidError = nil
+                                        if on && !LidSleepController.isPermissionInstalled,
+                                           let error = LidSleepController.installPermission() {
+                                            lidError = error
+                                            return
+                                        }
+                                        monitor.update { $0.keepAwakeLidClosed = on }
+                                        lidPermissionInstalled = LidSleepController.isPermissionInstalled
+                                    }
+                                )
+                            )
+                            if let lidError {
+                                Text(lidError)
+                                    .font(DesignTokens.Typography.caption)
+                                    .foregroundColor(.orange)
+                            }
+                        }
+                        if lidPermissionInstalled && !monitor.settings.keepAwakeLidClosed {
+                            Button("Remove lid-sleep permission") {
+                                lidError = LidSleepController.removePermission()
+                                lidPermissionInstalled = LidSleepController.isPermissionInstalled
+                            }
+                            .controlSize(.small)
                         }
                     }
                 }

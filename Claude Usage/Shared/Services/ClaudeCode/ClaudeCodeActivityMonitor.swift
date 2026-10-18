@@ -29,6 +29,8 @@ struct ClaudeCodeActivitySettings: Codable, Equatable {
     var keepAwakeAlways = false
     /// Also prevent display sleep while keeping awake
     var keepScreenOn = false
+    /// Also stay awake with the lid closed (needs the one-time admin permission)
+    var keepAwakeLidClosed = false
 
     var anyFeatureOn: Bool { pulseIcon || keepAwake || alertOnNeedsInput || alertOnFinished }
 
@@ -48,6 +50,7 @@ struct ClaudeCodeActivitySettings: Codable, Equatable {
         countAccountUsage = try c.decodeIfPresent(Bool.self, forKey: .countAccountUsage) ?? d.countAccountUsage
         keepAwakeAlways = try c.decodeIfPresent(Bool.self, forKey: .keepAwakeAlways) ?? d.keepAwakeAlways
         keepScreenOn = try c.decodeIfPresent(Bool.self, forKey: .keepScreenOn) ?? d.keepScreenOn
+        keepAwakeLidClosed = try c.decodeIfPresent(Bool.self, forKey: .keepAwakeLidClosed) ?? d.keepAwakeLidClosed
     }
 }
 
@@ -119,6 +122,8 @@ final class ClaudeCodeActivityMonitor: NSObject, ObservableObject {
 
     func start() {
         UNUserNotificationCenter.current().delegate = self
+        // A crash or force-quit may have left lid sleep disabled
+        LidSleepController.resetToNormalSleep()
         apply(previous: nil)
     }
 
@@ -126,6 +131,7 @@ final class ClaudeCodeActivityMonitor: NSObject, ObservableObject {
         timer?.invalidate()
         timer = nil
         releaseAssertion()
+        LidSleepController.setSleepDisabled(false)
     }
 
     /// Changes settings; installs or removes the hooks as features turn on/off.
@@ -352,6 +358,8 @@ final class ClaudeCodeActivityMonitor: NSObject, ObservableObject {
         } else if assertionID != 0 {
             releaseAssertion()
         }
+        // Lid closed: only while keeping awake, never on a low battery
+        LidSleepController.setSleepDisabled(shouldHold && settings.keepAwakeLidClosed && !LidSleepController.batteryTooLow)
         if isKeepingAwake != (assertionID != 0) { isKeepingAwake = assertionID != 0 }
     }
 
