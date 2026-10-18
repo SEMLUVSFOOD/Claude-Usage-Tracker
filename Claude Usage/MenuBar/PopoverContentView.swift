@@ -159,13 +159,11 @@ struct PopoverContentView: View {
                 )
             }
 
-            if profiles.contains(where: { $0.provider.descriptor.capabilities.cliAccountSync }) {
-                KeepAwakeToggle(
-                    isOn: activity.settings.keepAwake,
-                    activityLabel: activity.activityLabel,
-                    onChange: { on in activity.update { $0.keepAwake = on } }
-                )
-            }
+            KeepAwakeToggle(
+                isOn: activity.settings.keepAwake,
+                activityLabel: activity.settings.keepAwakeAlways ? "always on" : activity.activityLabel,
+                onChange: { on in activity.update { $0.keepAwake = on } }
+            )
 
             PopoverDivider()
                 .padding(.top, 10)

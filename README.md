@@ -23,7 +23,7 @@ scripts/build-local.sh            # builds build/local/Claude Usage.app and Clau
 scripts/build-local.sh --install  # also replaces /Applications/Claude Usage.app and relaunches it
 ```
 
-The script downloads Apple's Swift 6.2 toolchain into `build/local` on first run (the project uses Swift 6.2 language features). Builds are ad-hoc signed, so after installing macOS asks once to let the app read its saved logins from the keychain — choose **Always Allow**.
+The script downloads Apple's Swift 6.2 toolchain into `build/local` on first run (the project uses Swift 6.2 language features). Builds are ad-hoc signed by default, so after each install macOS asks to let the app read its saved logins from the keychain — choose **Always Allow**. To stop that repeating on every rebuild, run `scripts/create-signing-cert.sh` once: it creates a local signing certificate so every build has the same signature.
 
 With Xcode, the project (`Claude Usage.xcodeproj`) builds as usual.
 

@@ -25,6 +25,10 @@ struct ClaudeCodeActivitySettings: Codable, Equatable {
     /// Also treat a rise in any account's usage (claude.ai, the Claude app,
     /// Codex, Antigravity…) as activity for the heartbeat and keep awake
     var countAccountUsage = true
+    /// Keep awake even when nothing is active (like caffeinate)
+    var keepAwakeAlways = false
+    /// Also prevent display sleep while keeping awake
+    var keepScreenOn = false
 
     var anyFeatureOn: Bool { pulseIcon || keepAwake || alertOnNeedsInput || alertOnFinished }
 
@@ -42,6 +46,8 @@ struct ClaudeCodeActivitySettings: Codable, Equatable {
         discord = try c.decodeIfPresent(Bool.self, forKey: .discord) ?? d.discord
         onlyWhenAway = try c.decodeIfPresent(Bool.self, forKey: .onlyWhenAway) ?? d.onlyWhenAway
         countAccountUsage = try c.decodeIfPresent(Bool.self, forKey: .countAccountUsage) ?? d.countAccountUsage
+        keepAwakeAlways = try c.decodeIfPresent(Bool.self, forKey: .keepAwakeAlways) ?? d.keepAwakeAlways
+        keepScreenOn = try c.decodeIfPresent(Bool.self, forKey: .keepScreenOn) ?? d.keepScreenOn
     }
 }
 
@@ -326,18 +332,24 @@ final class ClaudeCodeActivityMonitor: NSObject, ObservableObject {
 
     // MARK: - Keep awake
 
+    /// Which assertion is held: display sleep (screen stays on, which also
+    /// keeps the system awake) or only idle system sleep
+    private var assertionType = ""
+
     private func updateAssertion() {
-        let shouldHold = settings.keepAwake && isActive
-        if shouldHold && assertionID == 0 {
-            // Prevents idle *system* sleep; the display may still turn off
-            let result = IOPMAssertionCreateWithName(
-                kIOPMAssertionTypePreventUserIdleSystemSleep as CFString,
-                IOPMAssertionLevel(kIOPMAssertionLevelOn),
-                "Claude Code or an AI account is in use" as CFString,
-                &assertionID
-            )
-            if result != kIOReturnSuccess { assertionID = 0 }
-        } else if !shouldHold && assertionID != 0 {
+        let shouldHold = settings.keepAwake && (settings.keepAwakeAlways || isActive)
+        let type = settings.keepScreenOn
+            ? kIOPMAssertionTypePreventUserIdleDisplaySleep as String
+            : kIOPMAssertionTypePreventUserIdleSystemSleep as String
+        if shouldHold {
+            if assertionID != 0 && assertionType != type { releaseAssertion() }
+            if assertionID == 0 {
+                let reason = settings.keepAwakeAlways ? "Keep awake is on" : "Claude Code or an AI account is in use"
+                let result = IOPMAssertionCreateWithName(type as CFString, IOPMAssertionLevel(kIOPMAssertionLevelOn),
+                                                         reason as CFString, &assertionID)
+                if result == kIOReturnSuccess { assertionType = type } else { assertionID = 0 }
+            }
+        } else if assertionID != 0 {
             releaseAssertion()
         }
         if isKeepingAwake != (assertionID != 0) { isKeepingAwake = assertionID != 0 }

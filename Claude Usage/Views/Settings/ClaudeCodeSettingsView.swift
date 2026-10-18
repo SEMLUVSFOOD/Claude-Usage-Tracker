@@ -46,10 +46,25 @@ struct ClaudeCodeSettingsView: View {
                             isOn: binding(\.countAccountUsage)
                         )
                         SettingToggle(
-                            title: "Keep Mac awake while active",
-                            description: "Prevents idle sleep while a Claude Code session works or an account is in use. The screen can still turn off. Closing the lid still sleeps a MacBook unless it's on power with an external display.",
+                            title: "Keep Mac awake",
+                            description: "Prevents idle sleep. Closing the lid still sleeps a MacBook unless it's on power with an external display.",
                             isOn: binding(\.keepAwake)
                         )
+                        if monitor.settings.keepAwake {
+                            Picker("When", selection: Binding(
+                                get: { monitor.settings.keepAwakeAlways },
+                                set: { always in monitor.update { $0.keepAwakeAlways = always } }
+                            )) {
+                                Text("While Claude Code or an account is active").tag(false)
+                                Text("Always, until I turn it off").tag(true)
+                            }
+                            .pickerStyle(.radioGroup)
+                            SettingToggle(
+                                title: "Keep the screen on too",
+                                description: "Stops the display from turning off and locking while keeping awake",
+                                isOn: binding(\.keepScreenOn)
+                            )
+                        }
                     }
                 }
 

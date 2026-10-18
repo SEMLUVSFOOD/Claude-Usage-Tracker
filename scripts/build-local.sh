@@ -10,7 +10,8 @@
 #               (old copy moved to the Trash) and relaunch it.
 #
 # Signing: uses the "Claude Usage Local" certificate when present (stable
-# identity, so keychain "Always Allow" survives rebuilds), else ad-hoc.
+# identity, so keychain "Always Allow" survives rebuilds; create it once with
+# scripts/create-signing-cert.sh), else ad-hoc.
 # Override with SIGN_IDENTITY="name or -".
 set -euo pipefail
 
@@ -26,7 +27,8 @@ BUILD_NUMBER=$(grep -m1 'CURRENT_PROJECT_VERSION = ' "$PBX" | sed 's/.*= \(.*\);
 BUNDLE_ID="HamedElfayome.Claude-Usage"
 
 if [ -z "${SIGN_IDENTITY:-}" ]; then
-    if security find-certificate -c "Claude Usage Local" >/dev/null 2>&1; then
+    # Only when macOS considers it valid for signing (see create-signing-cert.sh)
+    if security find-identity -v -p codesigning 2>/dev/null | grep -q "Claude Usage Local"; then
         SIGN_IDENTITY="Claude Usage Local"
     else
         SIGN_IDENTITY="-"
