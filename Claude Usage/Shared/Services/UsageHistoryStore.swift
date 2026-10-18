@@ -62,9 +62,13 @@ final class UsageHistoryStore: ObservableObject {
         if let last = list.last {
             // A cached reading (same timestamp) is not new data
             guard sample.t > last.t else { return }
+            // An unused window's reset time is a placeholder that moves with
+            // every reading; only a used window's reset marks a new window
+            let newSessionWindow = sample.sr != last.sr && (sample.s > 0 || last.s > 0)
+            let newWeeklyWindow = sample.wr != last.wr && (sample.w > 0 || last.w > 0)
             let moved = abs(sample.s - last.s) >= Self.minimumChange
                 || abs(sample.w - last.w) >= Self.minimumChange
-                || sample.sr != last.sr || sample.wr != last.wr
+                || newSessionWindow || newWeeklyWindow
             guard moved || sample.t - last.t >= Self.minimumInterval else { return }
         }
         list.append(sample)

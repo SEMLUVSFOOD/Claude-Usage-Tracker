@@ -65,6 +65,10 @@ final class ClaudeCodeActivityMonitor: NSObject, ObservableObject {
         var project: String
         var folder: String
         var lastFinishedAlert: Date?
+        /// Transcript Claude Code appends to; watched for interruptions,
+        /// which don't fire the Stop hook
+        var transcriptPath: String?
+        var transcriptModified: Date?
     }
 
     @Published private(set) var settings: ClaudeCodeActivitySettings
@@ -93,14 +97,20 @@ final class ClaudeCodeActivityMonitor: NSObject, ObservableObject {
     }
 
     /// An account counts as active this long after its usage last rose
-    private static let accountActiveFor: TimeInterval = 5 * 60
+    private static let accountActiveFor: TimeInterval = 3 * 60
+    /// Claude account usage keeps rising for a while after Claude Code work
+    /// (the usage numbers lag). While hooks report Claude Code and shortly
+    /// after a session stops, those rises are ignored: the hooks are exact.
+    private static let claudeCodeUsageGrace: TimeInterval = 10 * 60
+    /// When a hooked Claude Code session last stopped working
+    private var lastClaudeCodeStop: Date?
 
     private static let settingsKey = "claudeCodeActivitySettings"
     private static let discordAccount = "discordWebhookURL"
     /// A "working" session with no events for this long is considered ended
     /// (Claude Code crashed or was closed mid-turn). Long enough for a single
     /// slow tool call such as a big build.
-    private static let staleAfter: TimeInterval = 2 * 3600
+    private static let staleAfter: TimeInterval = 15 * 60
     /// Hook events older than this (app wasn't running) are ignored
     private static let maxEventAge: TimeInterval = 10 * 60
     private static let awayAfter: TimeInterval = 120
@@ -215,10 +225,7 @@ final class ClaudeCodeActivityMonitor: NSObject, ObservableObject {
                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { continue }
             handle(json, folder: String(lines[0]), at: Date(timeIntervalSince1970: stamp))
         }
-        // Sessions that went quiet mid-turn
-        for (id, session) in sessions where session.state == .working && now.timeIntervalSince(session.lastEvent) > Self.staleAfter {
-            sessions[id]?.state = .idle
-        }
+        checkWorkingSessions(now: now)
         recompute()
     }
 
@@ -228,6 +235,10 @@ final class ClaudeCodeActivityMonitor: NSObject, ObservableObject {
     func noteUsage(profileId: UUID, provider: Provider, previous: ClaudeUsage?, current: ClaudeUsage) {
         guard settings.countAccountUsage, settings.anyFeatureOn, let previous,
               Self.usageIncreased(from: previous, to: current) else { return }
+        if provider.descriptor.capabilities.cliAccountSync {
+            let recentlyStopped = lastClaudeCodeStop.map { Date().timeIntervalSince($0) < Self.claudeCodeUsageGrace } ?? false
+            if workingCount > 0 || recentlyStopped { return }
+        }
         activeAccounts[profileId] = ActiveAccount(until: Date().addingTimeInterval(Self.accountActiveFor), provider: provider)
         recompute()
     }
@@ -288,6 +299,11 @@ final class ClaudeCodeActivityMonitor: NSObject, ObservableObject {
             session.project = URL(fileURLWithPath: cwd).lastPathComponent
         }
 
+        if let transcript = json["transcript_path"] as? String, !transcript.isEmpty {
+            session.transcriptPath = transcript
+        }
+        let wasWorking = session.state == .working
+
         switch event {
         case "UserPromptSubmit", "PostToolUse":
             session.state = .working
@@ -310,11 +326,49 @@ final class ClaudeCodeActivityMonitor: NSObject, ObservableObject {
             }
         case "SessionEnd":
             sessions[id] = nil
+            if wasWorking { lastClaudeCodeStop = date }
             return
         default:
             break
         }
+        if wasWorking && session.state != .working { lastClaudeCodeStop = date }
         sessions[id] = session
+    }
+
+    /// Working sessions that stopped without a Stop event: interrupted
+    /// (Escape / rejected tool, which skip the Stop hook) or gone quiet.
+    private func checkWorkingSessions(now: Date) {
+        for (id, session) in sessions where session.state == .working {
+            var updated = session
+            if let path = session.transcriptPath,
+               let modified = (try? FileManager.default.attributesOfItem(atPath: path))?[.modificationDate] as? Date,
+               modified != session.transcriptModified {
+                updated.transcriptModified = modified
+                if Self.transcriptEndsWithInterruption(path) {
+                    updated.state = .idle
+                }
+            }
+            let lastSign = max(session.lastEvent, updated.transcriptModified ?? .distantPast)
+            if updated.state == .working && now.timeIntervalSince(lastSign) > Self.staleAfter {
+                updated.state = .idle
+            }
+            if updated.state != .working { lastClaudeCodeStop = now }
+            sessions[id] = updated
+        }
+    }
+
+    /// Whether the transcript's last entry is Claude Code's
+    /// "[Request interrupted by user…]" marker.
+    static func transcriptEndsWithInterruption(_ path: String) -> Bool {
+        guard let handle = FileHandle(forReadingAtPath: path) else { return false }
+        defer { try? handle.close() }
+        let size = (try? handle.seekToEnd()) ?? 0
+        try? handle.seek(toOffset: size > 16_384 ? size - 16_384 : 0)
+        guard let data = try? handle.readToEnd(), let text = String(data: data, encoding: .utf8) else { return false }
+        guard let last = text.split(separator: "\n").last(where: { !$0.trimmingCharacters(in: .whitespaces).isEmpty }),
+              let json = try? JSONSerialization.jsonObject(with: Data(last.utf8)) as? [String: Any],
+              json["type"] as? String == "user" else { return false }
+        return String(describing: json["message"] ?? "").contains("[Request interrupted by user")
     }
 
     /// "Werk · my-project"
